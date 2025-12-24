@@ -123,9 +123,15 @@ class TestEndToEndWorkflows(unittest.TestCase):
 
         # Check that tests passed, ignoring pip warnings in stderr
         combined_output = f"{result.stdout}\n{result.stderr}"
-        self.assertIn("passed", combined_output.lower(), msg=f"Tests did not pass.\nStdout: {result.stdout}\nStderr: {result.stderr}")
+        self.assertIn(
+            "passed",
+            combined_output.lower(),
+            msg=f"Tests did not pass.\nStdout: {result.stdout}\nStderr: {result.stderr}",
+        )
         # Consider it successful if tests passed, even if there are warnings
-        has_test_failures = "failed" in combined_output.lower() and "0 failed" not in combined_output.lower()
+        has_test_failures = (
+            "failed" in combined_output.lower() and "0 failed" not in combined_output.lower()
+        )
         self.assertFalse(has_test_failures, msg=f"Tests failed.\nOutput: {combined_output}")
 
 

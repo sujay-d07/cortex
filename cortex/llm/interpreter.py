@@ -161,16 +161,12 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
             # Create messages with system prompt
             messages = [
                 {"role": "system", "content": self._get_system_prompt()},
-                {"role": "user", "content": user_input}
+                {"role": "user", "content": user_input},
             ]
 
             # Generate completion
             response = ollama.complete(
-                messages=messages,
-                model=model,
-                temperature=0.3,
-                max_tokens=1000,
-                stream=False
+                messages=messages, model=model, temperature=0.3, max_tokens=1000, stream=False
             )
 
             content = response.get("response", "").strip()
@@ -212,7 +208,7 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
             # Look for { or [ at the start
             start_idx = -1
             for i, char in enumerate(content):
-                if char in ['{', '[']:
+                if char in ["{", "["]:
                     start_idx = i
                     break
 
@@ -220,27 +216,27 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
                 content = content[start_idx:]
 
             # Find the matching closing bracket
-            if content.startswith('{'):
+            if content.startswith("{"):
                 # Find matching }
                 brace_count = 0
                 for i, char in enumerate(content):
-                    if char == '{':
+                    if char == "{":
                         brace_count += 1
-                    elif char == '}':
+                    elif char == "}":
                         brace_count -= 1
                         if brace_count == 0:
-                            content = content[:i+1]
+                            content = content[: i + 1]
                             break
-            elif content.startswith('['):
+            elif content.startswith("["):
                 # Find matching ]
                 bracket_count = 0
                 for i, char in enumerate(content):
-                    if char == '[':
+                    if char == "[":
                         bracket_count += 1
-                    elif char == ']':
+                    elif char == "]":
                         bracket_count -= 1
                         if bracket_count == 0:
-                            content = content[:i+1]
+                            content = content[: i + 1]
                             break
 
             data = json.loads(content)
@@ -253,6 +249,7 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
         except (json.JSONDecodeError, ValueError) as e:
             # Log the problematic content for debugging
             import logging
+
             logging.error(f"Failed to parse LLM response. Content: {content[:500]}")
             raise ValueError(f"Failed to parse LLM response: {str(e)}")
 

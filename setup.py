@@ -8,11 +8,13 @@ from setuptools.command.install import install
 
 class PostInstallCommand(install):
     """Post-installation setup for Ollama."""
+
     def run(self):
         install.run(self)
         # Run Ollama setup after installation
         try:
             import subprocess
+
             subprocess.run([sys.executable, "scripts/setup_ollama.py"], check=False)
         except Exception as e:
             print(f"⚠️  Ollama setup encountered an issue: {e}")
@@ -21,11 +23,13 @@ class PostInstallCommand(install):
 
 class PostDevelopCommand(develop):
     """Post-development setup for Ollama."""
+
     def run(self):
         develop.run(self)
         # Run Ollama setup after development install
         try:
             import subprocess
+
             subprocess.run([sys.executable, "scripts/setup_ollama.py"], check=False)
         except Exception as e:
             print(f"⚠️  Ollama setup encountered an issue: {e}")
@@ -82,9 +86,8 @@ setup(
         ],
     },
     cmdclass={
-        'install': PostInstallCommand,
-        'develop': PostDevelopCommand,
+        "install": PostInstallCommand,
+        "develop": PostDevelopCommand,
     },
     include_package_data=True,
 )
-

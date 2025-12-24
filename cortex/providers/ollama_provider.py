@@ -39,11 +39,11 @@ class OllamaProvider:
     # Preferred models in order of preference (code-focused models first)
     PREFERRED_MODELS = [
         "deepseek-coder-v2:16b",  # Excellent for code and system tasks
-        "codellama:13b",           # Meta's code-specialized model
-        "deepseek-coder:6.7b",     # Good balance of speed and quality
-        "llama3:8b",               # General purpose, very capable
-        "mistral:7b",              # Fast and efficient
-        "phi3:mini",               # Lightweight, good for quick tasks
+        "codellama:13b",  # Meta's code-specialized model
+        "deepseek-coder:6.7b",  # Good balance of speed and quality
+        "llama3:8b",  # General purpose, very capable
+        "mistral:7b",  # Fast and efficient
+        "phi3:mini",  # Lightweight, good for quick tasks
     ]
 
     # Fallback models if preferred ones aren't available
@@ -122,10 +122,12 @@ class OllamaProvider:
             if install_result.returncode == 0:
                 logger.info("✅ Ollama installed successfully")
                 # Start Ollama service
-                subprocess.run(["ollama", "serve"],
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL,
-                             start_new_session=True)
+                subprocess.run(
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
                 time.sleep(2)  # Give service time to start
                 return True
             else:
@@ -144,10 +146,7 @@ class OllamaProvider:
             True if service is accessible, False otherwise
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=5
-            )
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
         except requests.RequestException:
             return False
@@ -202,10 +201,7 @@ class OllamaProvider:
             return self._available_models
 
         try:
-            response = requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=10
-            )
+            response = requests.get(f"{self.base_url}/api/tags", timeout=10)
             response.raise_for_status()
 
             data = response.json()
@@ -266,7 +262,7 @@ class OllamaProvider:
                 f"{self.base_url}/api/pull",
                 json={"name": model_name},
                 stream=True,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             response.raise_for_status()
 
@@ -359,7 +355,7 @@ class OllamaProvider:
                     "stream": stream,
                 },
                 stream=stream,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             response.raise_for_status()
 
@@ -398,7 +394,9 @@ class OllamaProvider:
         prompt_parts.append("Assistant: ")
         return "\n".join(prompt_parts)
 
-    def _stream_response(self, response: requests.Response) -> Generator[dict[str, Any], None, None]:
+    def _stream_response(
+        self, response: requests.Response
+    ) -> Generator[dict[str, Any], None, None]:
         """
         Stream response chunks.
 
@@ -428,9 +426,7 @@ class OllamaProvider:
         """
         try:
             response = requests.post(
-                f"{self.base_url}/api/show",
-                json={"name": model_name},
-                timeout=10
+                f"{self.base_url}/api/show", json={"name": model_name}, timeout=10
             )
             response.raise_for_status()
             return response.json()

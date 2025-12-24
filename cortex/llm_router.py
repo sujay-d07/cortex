@@ -320,21 +320,21 @@ class LLMRouter:
                 # Smart fallback priority: Local → Cloud
                 if routing.provider == LLMProvider.OLLAMA:
                     fallback_provider = (
-                        LLMProvider.CLAUDE if self.claude_client
-                        else LLMProvider.KIMI_K2 if self.kimi_client
-                        else None
+                        LLMProvider.CLAUDE
+                        if self.claude_client
+                        else LLMProvider.KIMI_K2 if self.kimi_client else None
                     )
                 elif routing.provider == LLMProvider.CLAUDE:
                     fallback_provider = (
-                        LLMProvider.OLLAMA if self.ollama_client
-                        else LLMProvider.KIMI_K2 if self.kimi_client
-                        else None
+                        LLMProvider.OLLAMA
+                        if self.ollama_client
+                        else LLMProvider.KIMI_K2 if self.kimi_client else None
                     )
                 else:  # KIMI_K2
                     fallback_provider = (
-                        LLMProvider.OLLAMA if self.ollama_client
-                        else LLMProvider.CLAUDE if self.claude_client
-                        else None
+                        LLMProvider.OLLAMA
+                        if self.ollama_client
+                        else LLMProvider.CLAUDE if self.claude_client else None
                     )
 
                 if fallback_provider:

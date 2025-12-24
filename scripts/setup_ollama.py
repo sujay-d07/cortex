@@ -227,7 +227,9 @@ def setup_ollama():
     # Install Ollama
     if not install_ollama():
         logger.warning("⚠️  Ollama installation skipped")
-        logger.info("ℹ️  You can install it later with: curl -fsSL https://ollama.com/install.sh | sh")
+        logger.info(
+            "ℹ️  You can install it later with: curl -fsSL https://ollama.com/install.sh | sh"
+        )
         logger.info("ℹ️  Cortex will fall back to cloud providers (Claude/OpenAI) if configured")
         return
 

@@ -20,7 +20,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 # Add parent directory to path
-sys.path.insert(0, '..')
+sys.path.insert(0, "..")
 
 from cortex.llm_router import LLMRouter, TaskType
 from cortex.providers.ollama_provider import OllamaProvider
@@ -83,9 +83,7 @@ def demo_local_completion():
     console.print(f"Using model: [cyan]{model}[/cyan]")
 
     # Test completion
-    messages = [
-        {"role": "user", "content": "How do I install nginx on Ubuntu? Be brief."}
-    ]
+    messages = [{"role": "user", "content": "How do I install nginx on Ubuntu? Be brief."}]
 
     console.print("\n[yellow]Generating response...[/yellow]")
     start_time = time.time()
@@ -110,19 +108,14 @@ def demo_router_with_fallback():
     console.print(f"Reasoning: {routing.reasoning}")
 
     # Test completion
-    messages = [
-        {"role": "user", "content": "List 3 lightweight text editors for Ubuntu"}
-    ]
+    messages = [{"role": "user", "content": "List 3 lightweight text editors for Ubuntu"}]
 
     console.print("\n[yellow]Generating response...[/yellow]")
     start_time = time.time()
 
     try:
         response = router.complete(
-            messages=messages,
-            task_type=TaskType.SYSTEM_OPERATION,
-            temperature=0.7,
-            max_tokens=200
+            messages=messages, task_type=TaskType.SYSTEM_OPERATION, temperature=0.7, max_tokens=200
         )
 
         elapsed = time.time() - start_time
@@ -159,11 +152,13 @@ def show_provider_comparison():
 
 def main():
     """Main demo function."""
-    console.print(Panel.fit(
-        "[bold cyan]Cortex Linux - Ollama Integration Demo[/bold cyan]\n"
-        "[dim]Privacy-First, Offline-Capable Package Management[/dim]",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]Cortex Linux - Ollama Integration Demo[/bold cyan]\n"
+            "[dim]Privacy-First, Offline-Capable Package Management[/dim]",
+            border_style="cyan",
+        )
+    )
 
     # Check Ollama status
     if not check_ollama_status():

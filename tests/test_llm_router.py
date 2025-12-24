@@ -47,14 +47,18 @@ class TestRoutingLogic(unittest.TestCase):
         """System operations should route to Ollama by default."""
         decision = self.router.route_task(TaskType.SYSTEM_OPERATION)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
         self.assertEqual(decision.task_type, TaskType.SYSTEM_OPERATION)
 
     def test_error_debugging_routes_to_ollama(self):
         """Error debugging should route to Ollama by default."""
         decision = self.router.route_task(TaskType.ERROR_DEBUGGING)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
 
     def test_requirement_parsing_routes_to_ollama(self):
         """Requirement parsing should route to Ollama by default."""
@@ -66,25 +70,33 @@ class TestRoutingLogic(unittest.TestCase):
         """Code generation should route to Ollama by default."""
         decision = self.router.route_task(TaskType.CODE_GENERATION)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
 
     def test_dependency_resolution_routes_to_ollama(self):
         """Dependency resolution should route to Ollama by default."""
         decision = self.router.route_task(TaskType.DEPENDENCY_RESOLUTION)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
 
     def test_configuration_routes_to_ollama(self):
         """Configuration tasks should route to Ollama by default."""
         decision = self.router.route_task(TaskType.CONFIGURATION)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
 
     def test_tool_execution_routes_to_ollama(self):
         """Tool execution should route to Ollama by default."""
         decision = self.router.route_task(TaskType.TOOL_EXECUTION)
         # With Ollama integration, defaults to Ollama, but falls back if unavailable
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE]
+        )
 
     def test_force_provider_override(self):
         """Forcing a provider should override routing logic."""
@@ -105,7 +117,9 @@ class TestFallbackBehavior(unittest.TestCase):
 
         # If Ollama unavailable, should fallback to cloud providers
         decision = router.route_task(TaskType.USER_CHAT)
-        self.assertIn(decision.provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2])
+        self.assertIn(
+            decision.provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2]
+        )
 
     @patch.dict(os.environ, {}, clear=True)
     def test_fallback_to_claude_when_kimi_unavailable(self):
@@ -660,8 +674,12 @@ class TestParallelProcessing(unittest.TestCase):
             responses = await router.complete_batch(requests, max_concurrent=2)
             self.assertEqual(len(responses), 2)
             # With Ollama integration, providers may be different based on availability
-            self.assertIn(responses[0].provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2])
-            self.assertIn(responses[1].provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2])
+            self.assertIn(
+                responses[0].provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2]
+            )
+            self.assertIn(
+                responses[1].provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2]
+            )
 
         asyncio.run(run_test())
 
