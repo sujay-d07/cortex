@@ -336,7 +336,7 @@ class LLMRouter:
                         else LLMProvider.CLAUDE if self.claude_client
                         else None
                     )
-                
+
                 if fallback_provider:
                     logger.info(f"🔄 Attempting fallback to {fallback_provider.value}")
 
@@ -374,7 +374,7 @@ class LLMRouter:
             raise RuntimeError("Ollama client not initialized")
 
         start_time = time.time()
-        
+
         response_data = self.ollama_client.complete(
             messages=messages,
             temperature=temperature,
@@ -384,7 +384,7 @@ class LLMRouter:
 
         content = response_data.get("response", "")
         model = response_data.get("model", "unknown")
-        
+
         # Ollama doesn't provide token counts in the same way
         # Estimate based on response length
         tokens_used = len(content.split()) * 1.3  # Rough estimate

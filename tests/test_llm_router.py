@@ -402,11 +402,21 @@ class TestKimiIntegration(unittest.TestCase):
 class TestEndToEnd(unittest.TestCase):
     """End-to-end integration tests."""
 
+    @patch("cortex.llm_router.OllamaProvider")
     @patch("cortex.llm_router.Anthropic")
     @patch("cortex.llm_router.OpenAI")
-    def test_complete_with_routing(self, mock_openai, mock_anthropic):
+    def test_complete_with_routing(self, mock_openai, mock_anthropic, mock_ollama_class):
         """Test complete() method with full routing."""
-        # Mock Kimi K2 (should be used for system operations)
+        # Mock Ollama provider with proper complete method
+        mock_ollama = Mock()
+        mock_ollama.is_running.return_value = True
+        mock_ollama.complete.return_value = {
+            "response": "Installing CUDA drivers and toolkit...",
+            "model": "codellama:latest",
+        }
+        mock_ollama_class.return_value = mock_ollama
+
+        # Mock Kimi K2 as fallback
         mock_message = Mock()
         mock_message.content = "Installing CUDA..."
 
@@ -424,22 +434,30 @@ class TestEndToEnd(unittest.TestCase):
 
         # Create router
         router = LLMRouter(claude_api_key="test-claude", kimi_api_key="test-kimi")
+        router.ollama_client = mock_ollama
 
-        # Test system operation (should route to Ollama by default, may fallback to Kimi if unavailable)
+        # Test system operation (should route to Ollama first)
         response = router.complete(
             messages=[{"role": "user", "content": "Install CUDA"}],
             task_type=TaskType.SYSTEM_OPERATION,
         )
 
-        # With Ollama integration, may route to Ollama or fallback to Kimi/Claude
-        self.assertIn(response.provider, [LLMProvider.OLLAMA, LLMProvider.KIMI_K2, LLMProvider.CLAUDE])
+        # With Ollama mocked as available, should use Ollama
+        self.assertEqual(response.provider, LLMProvider.OLLAMA)
         # Response should mention CUDA
         self.assertIn("CUDA", response.content)
 
+    @patch("cortex.llm_router.OllamaProvider")
     @patch("cortex.llm_router.Anthropic")
     @patch("cortex.llm_router.OpenAI")
-    def test_fallback_on_error(self, mock_openai, mock_anthropic):
+    def test_fallback_on_error(self, mock_openai, mock_anthropic, mock_ollama_class):
         """Test fallback when primary provider fails."""
+        # Mock Ollama provider to fail
+        mock_ollama = Mock()
+        mock_ollama.is_running.return_value = True
+        mock_ollama.complete.side_effect = Exception("Ollama unavailable")
+        mock_ollama_class.return_value = mock_ollama
+
         # Mock Kimi K2 to fail
         mock_kimi_client = Mock()
         mock_kimi_client.chat.completions.create.side_effect = Exception("API Error")
@@ -462,17 +480,20 @@ class TestEndToEnd(unittest.TestCase):
         router = LLMRouter(
             claude_api_key="test-claude", kimi_api_key="test-kimi", enable_fallback=True
         )
+        router.ollama_client = mock_ollama
+        router.claude_client = mock_claude_client
+        router.kimi_client = mock_kimi_client
 
-        # System operation should try Ollama first, then fallback chain
+        # System operation should try Ollama first, then fallback to Claude
         response = router.complete(
             messages=[{"role": "user", "content": "Install CUDA"}],
             task_type=TaskType.SYSTEM_OPERATION,
         )
 
-        # With Ollama integration, could be Ollama or any fallback provider
-        self.assertIn(response.provider, [LLMProvider.OLLAMA, LLMProvider.CLAUDE, LLMProvider.KIMI_K2])
+        # Should fallback to Claude after Ollama and Kimi fail
+        self.assertEqual(response.provider, LLMProvider.CLAUDE)
         # Check response content exists
-        self.assertIsNotNone(response.content)
+        self.assertEqual(response.content, "Fallback response")
 
 
 class TestConvenienceFunction(unittest.TestCase):

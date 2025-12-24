@@ -145,25 +145,25 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
         """Call local Ollama instance for offline/local inference"""
         try:
             from cortex.providers.ollama_provider import OllamaProvider
-            
+
             # Initialize Ollama provider
             ollama = OllamaProvider(base_url=self.ollama_url)
-            
+
             # Ensure service and model are available
             if not ollama.is_running():
                 if not ollama.start_service():
                     raise RuntimeError("Failed to start Ollama service")
-            
+
             model = ollama.ensure_model_available()
             if not model:
                 raise RuntimeError("No Ollama models available. Run: ollama pull llama3:8b")
-            
+
             # Create messages with system prompt
             messages = [
                 {"role": "system", "content": self._get_system_prompt()},
                 {"role": "user", "content": user_input}
             ]
-            
+
             # Generate completion
             response = ollama.complete(
                 messages=messages,
@@ -172,7 +172,7 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
                 max_tokens=1000,
                 stream=False
             )
-            
+
             content = response.get("response", "").strip()
             return self._parse_commands(content)
 
@@ -204,10 +204,10 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
                 parts = content.split("```")
                 if len(parts) >= 3:
                     content = parts[1].strip()
-            
+
             # Remove any leading/trailing whitespace and newlines
             content = content.strip()
-            
+
             # Try to find JSON object/array in the content
             # Look for { or [ at the start
             start_idx = -1
@@ -215,10 +215,10 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
                 if char in ['{', '[']:
                     start_idx = i
                     break
-            
+
             if start_idx > 0:
                 content = content[start_idx:]
-            
+
             # Find the matching closing bracket
             if content.startswith('{'):
                 # Find matching }
@@ -242,7 +242,7 @@ Example response: {"commands": ["sudo apt update", "sudo apt install -y docker.i
                         if bracket_count == 0:
                             content = content[:i+1]
                             break
-            
+
             data = json.loads(content)
             commands = data.get("commands", [])
 

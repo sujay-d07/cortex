@@ -26,7 +26,7 @@ def is_ollama_installed() -> bool:
 def install_ollama() -> bool:
     """
     Install Ollama using the official installation script.
-    
+
     Returns:
         True if installation succeeded, False otherwise
     """
@@ -36,7 +36,7 @@ def install_ollama() -> bool:
 
     logger.info("📦 Installing Ollama for local LLM support...")
     logger.info("   This enables privacy-first, offline package management")
-    
+
     try:
         # Download installation script
         logger.info("   Downloading Ollama installer...")
@@ -46,7 +46,7 @@ def install_ollama() -> bool:
             text=True,
             timeout=60,
         )
-        
+
         if result.returncode != 0:
             logger.error(f"❌ Failed to download Ollama installer: {result.stderr}")
             return False
@@ -79,7 +79,7 @@ def install_ollama() -> bool:
 def start_ollama_service() -> bool:
     """
     Start the Ollama service.
-    
+
     Returns:
         True if service started, False otherwise
     """
@@ -87,7 +87,7 @@ def start_ollama_service() -> bool:
         return False
 
     logger.info("🚀 Starting Ollama service...")
-    
+
     try:
         # Start Ollama in background
         subprocess.Popen(
@@ -96,7 +96,7 @@ def start_ollama_service() -> bool:
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        
+
         # Give it a moment to start
         time.sleep(2)
         logger.info("✅ Ollama service started")
@@ -110,7 +110,7 @@ def start_ollama_service() -> bool:
 def prompt_model_selection() -> str:
     """
     Prompt user to select which Ollama model to download.
-    
+
     Returns:
         Model name selected by user
     """
@@ -118,7 +118,7 @@ def prompt_model_selection() -> str:
     print("📦 Select Ollama Model to Download")
     print("=" * 60)
     print("\nAvailable models (Quality vs Size trade-off):\n")
-    
+
     models = [
         ("codellama:7b", "3.8 GB", "Good for code, fast (DEFAULT)", True),
         ("llama3:8b", "4.7 GB", "Balanced, general purpose"),
@@ -126,23 +126,23 @@ def prompt_model_selection() -> str:
         ("deepseek-coder:6.7b", "3.8 GB", "Code-optimized"),
         ("mistral:7b", "4.1 GB", "Fast and efficient"),
     ]
-    
+
     for i, (name, size, desc, *is_default) in enumerate(models, 1):
         default_marker = " ⭐" if is_default else ""
         print(f"  {i}. {name:<20} | {size:<8} | {desc}{default_marker}")
-    
-    print(f"\n  6. Skip (download later)")
+
+    print("\n  6. Skip (download later)")
     print("\n" + "=" * 60)
-    
+
     try:
         choice = input("\nSelect option (1-6) [Press Enter for default]: ").strip()
-        
+
         if not choice:
             # Default to codellama:7b
             return "codellama:7b"
-        
+
         choice_num = int(choice)
-        
+
         if choice_num == 6:
             return "skip"
         elif 1 <= choice_num <= 5:
@@ -150,7 +150,7 @@ def prompt_model_selection() -> str:
         else:
             print("⚠️  Invalid choice, using default (codellama:7b)")
             return "codellama:7b"
-            
+
     except (ValueError, KeyboardInterrupt):
         print("\n⚠️  Using default model (codellama:7b)")
         return "codellama:7b"
@@ -159,23 +159,23 @@ def prompt_model_selection() -> str:
 def pull_selected_model(model_name: str) -> bool:
     """
     Pull the selected model for Cortex.
-    
+
     Args:
         model_name: Name of the model to pull
-        
+
     Returns:
         True if model pulled successfully, False otherwise
     """
     if not is_ollama_installed():
         return False
-    
+
     if model_name == "skip":
         logger.info("⏭️  Skipping model download - you can pull one later with: ollama pull <model>")
         return True
 
     logger.info(f"📥 Pulling {model_name} - this may take 5-10 minutes...")
     logger.info("   Downloading model from Ollama registry...")
-    
+
     try:
         # Show real-time progress
         process = subprocess.Popen(
@@ -184,15 +184,15 @@ def pull_selected_model(model_name: str) -> bool:
             stderr=subprocess.STDOUT,
             text=True,
         )
-        
+
         # Display progress in real-time
         for line in process.stdout:
             # Show progress lines
             if line.strip():
                 print(f"   {line.strip()}")
-        
+
         process.wait(timeout=600)  # 10 minutes timeout
-        
+
         if process.returncode == 0:
             logger.info(f"✅ {model_name} downloaded successfully")
             return True
@@ -213,12 +213,12 @@ def setup_ollama():
     logger.info("=" * 60)
     logger.info("Cortex Linux - Setting up local LLM support")
     logger.info("=" * 60)
-    
+
     # Check if we should skip Ollama setup
     if os.getenv("CORTEX_SKIP_OLLAMA_SETUP") == "1":
         logger.info("⏭️  Skipping Ollama setup (CORTEX_SKIP_OLLAMA_SETUP=1)")
         return
-    
+
     # Check if running in CI/automated environment
     if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
         logger.info("⏭️  Skipping Ollama setup in CI environment")
@@ -243,7 +243,7 @@ def setup_ollama():
     else:
         logger.info("ℹ️  Non-interactive mode detected - skipping model download")
         logger.info("   You can pull a model later with: ollama pull <model>")
-    
+
     logger.info("\n" + "=" * 60)
     logger.info("✅ Cortex Linux setup complete!")
     logger.info("=" * 60)

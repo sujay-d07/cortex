@@ -20,7 +20,8 @@ import os
 import shutil
 import subprocess
 import time
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import requests
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 class OllamaProvider:
     """
     Provider for local LLM inference using Ollama.
-    
+
     Ollama enables running large language models locally without API keys.
     This provides privacy, offline capability, and zero cloud costs.
     """
@@ -53,7 +54,7 @@ class OllamaProvider:
     ]
 
     DEFAULT_OLLAMA_URL = "http://localhost:11434"
-    
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -62,7 +63,7 @@ class OllamaProvider:
     ):
         """
         Initialize Ollama provider.
-        
+
         Args:
             base_url: Ollama API URL (defaults to localhost:11434)
             timeout: Request timeout in seconds
@@ -78,7 +79,7 @@ class OllamaProvider:
     def is_installed() -> bool:
         """
         Check if Ollama is installed on the system.
-        
+
         Returns:
             True if Ollama is available, False otherwise
         """
@@ -88,7 +89,7 @@ class OllamaProvider:
     def install_ollama() -> bool:
         """
         Install Ollama on the system.
-        
+
         Returns:
             True if installation succeeded, False otherwise
         """
@@ -105,7 +106,7 @@ class OllamaProvider:
                 text=True,
                 timeout=60,
             )
-            
+
             if result.returncode != 0:
                 logger.error(f"Failed to download Ollama installer: {result.stderr}")
                 return False
@@ -121,8 +122,8 @@ class OllamaProvider:
             if install_result.returncode == 0:
                 logger.info("✅ Ollama installed successfully")
                 # Start Ollama service
-                subprocess.run(["ollama", "serve"], 
-                             stdout=subprocess.DEVNULL, 
+                subprocess.run(["ollama", "serve"],
+                             stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL,
                              start_new_session=True)
                 time.sleep(2)  # Give service time to start
@@ -138,7 +139,7 @@ class OllamaProvider:
     def is_running(self) -> bool:
         """
         Check if Ollama service is running.
-        
+
         Returns:
             True if service is accessible, False otherwise
         """
@@ -154,7 +155,7 @@ class OllamaProvider:
     def start_service(self) -> bool:
         """
         Start Ollama service if not running.
-        
+
         Returns:
             True if service started successfully, False otherwise
         """
@@ -175,14 +176,14 @@ class OllamaProvider:
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
-            
+
             # Wait for service to be ready
             for i in range(10):
                 time.sleep(1)
                 if self.is_running():
                     logger.info("✅ Ollama service started")
                     return True
-            
+
             logger.error("Ollama service failed to start")
             return False
 
@@ -193,7 +194,7 @@ class OllamaProvider:
     def get_available_models(self) -> list[str]:
         """
         Get list of models available locally.
-        
+
         Returns:
             List of model names
         """
@@ -206,7 +207,7 @@ class OllamaProvider:
                 timeout=10
             )
             response.raise_for_status()
-            
+
             data = response.json()
             self._available_models = [model["name"] for model in data.get("models", [])]
             return self._available_models
@@ -218,9 +219,9 @@ class OllamaProvider:
     def select_best_model(self) -> str | None:
         """
         Select the best available model for Cortex tasks.
-        
+
         Prefers code-focused models, falls back to general models.
-        
+
         Returns:
             Model name or None if no models available
         """
@@ -228,7 +229,7 @@ class OllamaProvider:
             return self._selected_model
 
         available = self.get_available_models()
-        
+
         if not available:
             logger.warning("No models available locally")
             return None
@@ -251,15 +252,15 @@ class OllamaProvider:
     def pull_model(self, model_name: str) -> bool:
         """
         Pull a model from Ollama registry.
-        
+
         Args:
             model_name: Name of model to pull
-            
+
         Returns:
             True if successful, False otherwise
         """
         logger.info(f"📥 Pulling model: {model_name}")
-        
+
         try:
             response = requests.post(
                 f"{self.base_url}/api/pull",
@@ -287,12 +288,12 @@ class OllamaProvider:
     def ensure_model_available(self) -> str | None:
         """
         Ensure a suitable model is available, pulling one if necessary.
-        
+
         Returns:
             Model name or None if setup failed
         """
         model = self.select_best_model()
-        
+
         if model:
             return model
 
@@ -320,14 +321,14 @@ class OllamaProvider:
     ) -> dict[str, Any] | Generator[dict[str, Any], None, None]:
         """
         Generate completion using local Ollama model.
-        
+
         Args:
             messages: Chat messages in OpenAI format
             model: Specific model to use (auto-selected if None)
             temperature: Sampling temperature
             max_tokens: Maximum response length
             stream: Enable streaming responses
-            
+
         Returns:
             Response dict or generator if streaming
         """
@@ -374,36 +375,36 @@ class OllamaProvider:
     def _messages_to_prompt(self, messages: list[dict[str, str]]) -> str:
         """
         Convert OpenAI-style messages to a single prompt.
-        
+
         Args:
             messages: List of message dicts with 'role' and 'content'
-            
+
         Returns:
             Formatted prompt string
         """
         prompt_parts = []
-        
+
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            
+
             if role == "system":
                 prompt_parts.append(f"System: {content}\n")
             elif role == "assistant":
                 prompt_parts.append(f"Assistant: {content}\n")
             else:  # user
                 prompt_parts.append(f"User: {content}\n")
-        
+
         prompt_parts.append("Assistant: ")
         return "\n".join(prompt_parts)
 
     def _stream_response(self, response: requests.Response) -> Generator[dict[str, Any], None, None]:
         """
         Stream response chunks.
-        
+
         Args:
             response: Streaming response from Ollama
-            
+
         Yields:
             Response chunk dicts
         """
@@ -418,10 +419,10 @@ class OllamaProvider:
     def get_model_info(self, model_name: str) -> dict[str, Any] | None:
         """
         Get information about a specific model.
-        
+
         Args:
             model_name: Name of the model
-            
+
         Returns:
             Model info dict or None if not found
         """
