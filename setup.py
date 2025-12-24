@@ -1,6 +1,35 @@
 import os
-
+import sys
 from setuptools import find_packages, setup
+from setuptools.command.install import install
+from setuptools.command.develop import develop
+
+
+class PostInstallCommand(install):
+    """Post-installation setup for Ollama."""
+    def run(self):
+        install.run(self)
+        # Run Ollama setup after installation
+        try:
+            import subprocess
+            subprocess.run([sys.executable, "scripts/setup_ollama.py"], check=False)
+        except Exception as e:
+            print(f"⚠️  Ollama setup encountered an issue: {e}")
+            print("ℹ️  You can run it manually later with: python scripts/setup_ollama.py")
+
+
+class PostDevelopCommand(develop):
+    """Post-development setup for Ollama."""
+    def run(self):
+        develop.run(self)
+        # Run Ollama setup after development install
+        try:
+            import subprocess
+            subprocess.run([sys.executable, "scripts/setup_ollama.py"], check=False)
+        except Exception as e:
+            print(f"⚠️  Ollama setup encountered an issue: {e}")
+            print("ℹ️  You can run it manually later with: python scripts/setup_ollama.py")
+
 
 with open("README.md", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -18,14 +47,14 @@ if os.path.exists(requirements_path):
             if line.strip() and not line.startswith("#") and not line.startswith("-r")
         ]
 else:
-    requirements = ["anthropic>=0.18.0", "openai>=1.0.0"]
+    requirements = ["anthropic>=0.18.0", "openai>=1.0.0", "requests>=2.32.4"]
 
 setup(
     name="cortex-linux",
     version="0.1.0",
     author="Cortex Linux",
     author_email="mike@cortexlinux.com",
-    description="AI-powered Linux command interpreter",
+    description="AI-powered Linux command interpreter with local LLM support",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/cortexlinux/cortex",
@@ -48,7 +77,13 @@ setup(
     entry_points={
         "console_scripts": [
             "cortex=cortex.cli:main",
+            "cortex-setup-ollama=scripts.setup_ollama:setup_ollama",
         ],
+    },
+    cmdclass={
+        'install': PostInstallCommand,
+        'develop': PostDevelopCommand,
     },
     include_package_data=True,
 )
+

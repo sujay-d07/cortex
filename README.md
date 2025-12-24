@@ -63,13 +63,15 @@ cortex install "tools for video compression"
 
 | Feature | Description |
 |---------|-------------|
-| **Natural Language** | Describe what you need in plain English |
-| **Dry-Run Default** | Preview all commands before execution |
-| **Sandboxed Execution** | Commands run in Firejail isolation |
-| **Full Rollback** | Undo any installation with `cortex rollback` |
-| **Audit Trail** | Complete history in `~/.cortex/history.db` |
-| **Hardware-Aware** | Detects GPU, CPU, memory for optimized packages |
-| **Multi-LLM Support** | Works with Claude, GPT-4, or local Ollama models |
+| **🤖 Natural Language** | Describe what you need in plain English |
+| **🔒 Privacy-First** | Local LLM support via Ollama - no API keys required |
+| **📴 Offline Capable** | Works completely offline with local models |
+| **🆓 Zero Cost** | Free local inference, optional cloud fallback |
+| **🛡️ Sandboxed Execution** | Commands run in Firejail isolation |
+| **⏮️ Full Rollback** | Undo any installation with `cortex rollback` |
+| **📋 Audit Trail** | Complete history in `~/.cortex/history.db` |
+| **🔧 Hardware-Aware** | Detects GPU, CPU, memory for optimized packages |
+| **☁️ Multi-LLM Support** | Ollama (local), Claude, GPT-4, or Kimi K2 |
 
 ---
 
@@ -79,7 +81,7 @@ cortex install "tools for video compression"
 
 - **OS:** Ubuntu 22.04+ / Debian 12+
 - **Python:** 3.10 or higher
-- **API Key:** [Anthropic](https://console.anthropic.com) or [OpenAI](https://platform.openai.com)
+- **API Key (Optional):** [Anthropic](https://console.anthropic.com) or [OpenAI](https://platform.openai.com) for cloud fallback
 
 ### Installation
 
@@ -92,20 +94,26 @@ cd cortex
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install Cortex
+# 3. Install Cortex (auto-installs Ollama for local LLM)
 pip install -e .
 
-# 4. Configure API key
+# 4. (Optional) Configure cloud API key for fallback
 echo 'ANTHROPIC_API_KEY=your-key-here' > .env
 
 # 5. Verify installation
 cortex --version
+
+# 6. Check Ollama status (should be auto-installed)
+ollama list
 ```
+
+> **🎉 No API Keys Required!** Cortex automatically sets up Ollama for local, privacy-first LLM inference. Cloud API keys are optional fallbacks.
 
 ### First Run
 
 ```bash
 # Preview what would be installed (safe, no changes made)
+# Uses local Ollama by default - no API calls!
 cortex install nginx --dry-run
 
 # Actually install
@@ -119,7 +127,7 @@ cortex install nginx --execute
 ### Basic Commands
 
 ```bash
-# Install with natural language
+# Install with natural language (uses local LLM)
 cortex install "web server for static sites" --dry-run
 cortex install "image editing software like photoshop" --execute
 
@@ -131,6 +139,11 @@ cortex rollback <installation-id>
 
 # Check system preferences
 cortex check-pref
+
+# Manage local LLM models
+ollama list                    # Show available models
+ollama pull llama3:8b         # Download a model
+cortex-setup-ollama           # Re-run Ollama setup
 ```
 
 ### Command Reference
@@ -143,6 +156,7 @@ cortex check-pref
 | `cortex history` | View all past installations |
 | `cortex rollback <id>` | Undo a specific installation |
 | `cortex check-pref` | Display current preferences |
+| `cortex-setup-ollama` | Setup/reinstall Ollama integration |
 | `cortex --version` | Show version information |
 | `cortex --help` | Display help message |
 
@@ -156,6 +170,39 @@ Cortex stores configuration in `~/.cortex/`:
 ├── history.db       # Installation history (SQLite)
 └── audit.log        # Detailed audit trail
 ```
+
+### Local LLM Support (Ollama)
+
+**Privacy-First by Default**: Cortex uses local LLMs via Ollama for zero-cost, offline-capable operation.
+
+**Benefits:**
+- ✅ **100% Private**: All processing happens locally
+- ✅ **Completely Offline**: Works without internet after setup
+- ✅ **Zero Cost**: No API fees or subscriptions
+- ✅ **No API Keys**: Get started immediately
+
+**Recommended Models:**
+- `phi3:mini` (1.9GB) - Lightweight, default
+- `llama3:8b` (4.7GB) - Balanced performance
+- `codellama:13b` (9GB) - Code-optimized
+- `deepseek-coder-v2:16b` (10GB+) - Best for system tasks
+
+**Manage Models:**
+```bash
+ollama list                     # Show installed models
+ollama pull llama3:8b          # Download a model
+ollama rm phi3:mini            # Remove a model
+```
+
+**Cloud Fallback:**
+If local models are unavailable, Cortex automatically falls back to cloud providers (if configured):
+```bash
+# Optional: Set cloud API keys for fallback
+export ANTHROPIC_API_KEY=your-claude-key
+export OPENAI_API_KEY=your-openai-key
+```
+
+📖 **[Full Ollama Documentation](docs/OLLAMA_INTEGRATION.md)**
 
 ---
 
@@ -176,11 +223,12 @@ Cortex stores configuration in `~/.cortex/`:
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      LLM Router                                 │
-│              Claude / GPT-4 / Ollama                            │
+│         Ollama (Local) → Claude → GPT-4 → Kimi K2              │
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Anthropic  │  │   OpenAI    │  │   Ollama    │             │
-│  │   Claude    │  │    GPT-4    │  │   Local     │             │
+│  │   Ollama    │  │  Anthropic  │  │   OpenAI    │             │
+│  │   (Local)   │  │   Claude    │  │    GPT-4    │             │
+│  │  PRIORITY   │  │  Fallback 1 │  │  Fallback 2 │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 └─────────────────────────────────────────────────────────────────┘
                               │
