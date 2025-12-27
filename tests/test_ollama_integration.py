@@ -41,8 +41,9 @@ def get_available_ollama_model():
                     model_name = line.split()[0]
                     if model_name:
                         return model_name
-    except Exception:
-        pass
+    except Exception as e:
+        # If there is any error querying Ollama, treat it as "no models available"
+        print(f"Warning: could not list Ollama models: {e}", file=sys.stderr)
     return None
 
 
