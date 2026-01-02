@@ -195,6 +195,12 @@ pip install pytest pytest-cov pytest-mock black pylint mypy bandit
 - [ ] Commit messages are clear
 - [ ] Branch is up to date with `main`
 
+### Demo Evidence
+
+- **Bug fixes**: Before/after screen recording (with repro steps in description)
+- **Features**: Short demo video showing the feature in action
+- Keep videos lightweight (GIF/MP4), no secrets or personal data
+
 ### PR Template
 
 ```markdown
