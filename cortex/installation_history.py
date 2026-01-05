@@ -9,6 +9,7 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import re
 import sqlite3
 import subprocess
@@ -81,8 +82,6 @@ class InstallationHistory:
 
     def _ensure_db_directory(self):
         """Ensure database directory exists and is writable"""
-        import os
-
         db_dir = Path(self.db_path).parent
         try:
             db_dir.mkdir(parents=True, exist_ok=True)

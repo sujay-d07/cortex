@@ -1,20 +1,26 @@
 """
 API Key Auto-Detection Module
 
-Automatically detects API keys from common locations without requiring
-user to set environment variables. Searches in order:
+Automatically detects API keys and provider preferences from common locations
+without requiring user to manually set environment variables.
 
-1. Environment variables: ANTHROPIC_API_KEY, OPENAI_API_KEY
-2. ~/.cortex/.env
-3. ~/.config/anthropic (Claude CLI location)
-4. ~/.config/openai
-5. .env in current directory
+Detection order (highest priority first):
+1. CORTEX_PROVIDER=ollama environment variable (for explicit Ollama mode)
+2. API key environment variables: ANTHROPIC_API_KEY, OPENAI_API_KEY
+3. Cached key location (~/.cortex/.api_key_cache)
+4. Saved Ollama provider preference in ~/.cortex/.env (CORTEX_PROVIDER=ollama)
+5. API keys in ~/.cortex/.env
+6. ~/.config/anthropic/credentials.json (Claude CLI location)
+7. ~/.config/openai/credentials.json
+8. .env in current directory
 
-Implements caching to avoid repeated file checks and supports manual entry
-with optional saving to ~/.cortex/.env.
+Implements caching to avoid repeated file checks, file locking for safe
+concurrent access, and supports manual entry with optional saving to
+~/.cortex/.env.
 
 """
 
+import fcntl
 import json
 import os
 import re
@@ -238,12 +244,12 @@ class APIKeyDetector:
             cx_print(f"✓ Provider preference saved to ~/{CORTEX_DIR}/{CORTEX_ENV_FILE}", "success")
 
     def _save_provider_to_env(self, provider: str) -> None:
-        """Save provider preference to ~/.cortex/.env."""
+        """Save provider preference to ~/.cortex/.env with file locking."""
         try:
             env_file = Path.home() / CORTEX_DIR / CORTEX_ENV_FILE
-            existing = self._read_env_file(env_file)
-            updated = self._update_or_append_key(existing, "CORTEX_PROVIDER", provider)
-            self._atomic_write(env_file, updated)
+            self._locked_read_modify_write(
+                env_file, self._update_or_append_key, "CORTEX_PROVIDER", provider
+            )
         except Exception as e:
             cx_print(f"Warning: Could not save provider to ~/.cortex/.env: {e}", "warning")
 
@@ -472,6 +478,40 @@ class APIKeyDetector:
         temp_file.chmod(0o600)
         temp_file.replace(target_file)
 
+    def _locked_read_modify_write(self, env_file: Path, modifier_func: callable, *args) -> None:
+        """
+        Perform a locked read-modify-write operation on a file.
+
+        Uses file locking to prevent race conditions when multiple processes
+        try to modify the same file concurrently.
+
+        Args:
+            env_file: The file to modify
+            modifier_func: Function that takes (existing_content, *args) and returns new content
+            *args: Additional arguments to pass to modifier_func
+        """
+        env_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = env_file.with_suffix(".lock")
+
+        # Create lock file if it doesn't exist
+        lock_file.touch(exist_ok=True)
+
+        with open(lock_file, "r+") as lock_fd:
+            # Acquire exclusive lock (blocks until available)
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            try:
+                # Read current content
+                existing = env_file.read_text() if env_file.exists() else ""
+
+                # Apply modification
+                updated = modifier_func(existing, *args)
+
+                # Write atomically
+                self._atomic_write(env_file, updated)
+            finally:
+                # Release lock
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+
     def _cache_key_location(self, key: str, provider: str, source: str):
         """
         Cache the location where a key was found.
@@ -552,7 +592,8 @@ class APIKeyDetector:
         """
         Save API key to ~/.cortex/.env.
 
-        Uses atomic write operations to prevent corruption from concurrent access.
+        Uses file locking and atomic write operations to prevent corruption
+        and lost updates from concurrent access.
 
         Args:
             key: The API key to save
@@ -561,10 +602,7 @@ class APIKeyDetector:
         try:
             env_file = Path.home() / CORTEX_DIR / CORTEX_ENV_FILE
             var_name = self._get_env_var_name(provider)
-            existing = self._read_env_file(env_file)
-            updated = self._update_or_append_key(existing, var_name, key)
-
-            self._atomic_write(env_file, updated)
+            self._locked_read_modify_write(env_file, self._update_or_append_key, var_name, key)
 
         except Exception as e:
             # If save fails, print warning but don't crash
