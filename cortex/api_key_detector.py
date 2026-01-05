@@ -75,14 +75,53 @@ class APIKeyDetector:
             - provider: "anthropic" or "openai" (or None)
             - source: Where the key was found (or None)
         """
-        # Check cached location first
+        # Check for explicit CORTEX_PROVIDER=ollama in environment variable first
+        if os.environ.get("CORTEX_PROVIDER", "").lower() == "ollama":
+            return (True, "ollama-local", "ollama", "environment")
+
+        # Check for API keys in environment variables (highest priority)
+        result = self._check_environment_api_keys()
+        if result:
+            return result
+
+        # Check cached location
         result = self._check_cached_key()
         if result:
             return result
 
-        # Check in priority order
+        # Check for saved Ollama provider preference in config file
+        # (only if no API keys found in environment)
+        result = self._check_saved_ollama_provider()
+        if result:
+            return result
+
+        # Check other locations for API keys
         result = self._check_all_locations()
         return result or (False, None, None, None)
+
+    def _check_environment_api_keys(self) -> tuple[bool, str, str, str] | None:
+        """Check for API keys in environment variables."""
+        for env_var, provider in ENV_VAR_PROVIDERS.items():
+            value = os.environ.get(env_var)
+            if value:
+                return (True, value, provider, "environment")
+        return None
+
+    def _check_saved_ollama_provider(self) -> tuple[bool, str, str, str] | None:
+        """Check if Ollama was previously selected as the provider in config file."""
+        env_file = Path.home() / CORTEX_DIR / CORTEX_ENV_FILE
+        if env_file.exists():
+            try:
+                content = env_file.read_text()
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("CORTEX_PROVIDER="):
+                        value = line.split("=", 1)[1].strip().strip("\"'").lower()
+                        if value == "ollama":
+                            return (True, "ollama-local", "ollama", str(env_file))
+            except OSError:
+                pass
+        return None
 
     def _check_cached_key(self) -> tuple[bool, str | None, str | None, str | None] | None:
         """Check if we have a cached key that still works."""
@@ -173,6 +212,7 @@ class APIKeyDetector:
             return (False, None, None)
 
         if provider == "ollama":
+            self._ask_to_save_ollama_preference()
             return (True, "ollama-local", "ollama")
 
         key = self._get_and_validate_key(provider)
@@ -181,6 +221,30 @@ class APIKeyDetector:
 
         self._ask_to_save_key(key, provider)
         return (True, key, provider)
+
+    def _ask_to_save_ollama_preference(self) -> None:
+        """Ask user if they want to save Ollama as their default provider."""
+        print(
+            f"\nSave Ollama as default provider to ~/{CORTEX_DIR}/{CORTEX_ENV_FILE}? [Y/n] ", end=""
+        )
+        try:
+            response = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            response = "n"
+
+        if response != "n":
+            self._save_provider_to_env("ollama")
+            cx_print(f"✓ Provider preference saved to ~/{CORTEX_DIR}/{CORTEX_ENV_FILE}", "success")
+
+    def _save_provider_to_env(self, provider: str) -> None:
+        """Save provider preference to ~/.cortex/.env."""
+        try:
+            env_file = Path.home() / CORTEX_DIR / CORTEX_ENV_FILE
+            existing = self._read_env_file(env_file)
+            updated = self._update_or_append_key(existing, "CORTEX_PROVIDER", provider)
+            self._atomic_write(env_file, updated)
+        except Exception as e:
+            cx_print(f"Warning: Could not save provider to ~/.cortex/.env: {e}", "warning")
 
     def _get_provider_choice(self) -> str | None:
         """Get user's provider choice."""
