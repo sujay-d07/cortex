@@ -39,8 +39,10 @@ def get_available_ollama_model() -> str | None:
             lines = result.stdout.strip().split("\n")
             if len(lines) > 1:
                 # Model name is the first column
-                model_name = lines[1].split()[0]
-                return model_name
+                parts = lines[1].split()
+                if parts:
+                    model_name = parts[0]
+                    return model_name
     except Exception:
         pass
     return None
