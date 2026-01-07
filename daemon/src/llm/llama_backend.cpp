@@ -32,10 +32,10 @@ bool LlamaBackend::load(const std::string& path, int n_ctx, int n_threads) {
         
         LOG_INFO("LlamaBackend::load", "ENTRY - path=" + path);
         
-        // Unload existing model
+        // Unload existing model (use internal version since we already hold the lock)
         if (model_) {
             LOG_INFO("LlamaBackend::load", "Unloading existing model");
-            unload();
+            unload_internal();
         }
         
         LOG_INFO("LlamaBackend::load", "Setup model parameters");
@@ -96,7 +96,11 @@ bool LlamaBackend::load(const std::string& path, int n_ctx, int n_threads) {
 
 void LlamaBackend::unload() {
     std::lock_guard<std::mutex> lock(mutex_);
-    
+    unload_internal();
+}
+
+void LlamaBackend::unload_internal() {
+    // NOTE: Caller must hold mutex_
     if (ctx_) {
         llama_free(ctx_);
         ctx_ = nullptr;

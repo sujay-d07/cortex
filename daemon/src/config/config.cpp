@@ -67,6 +67,7 @@ std::optional<Config> Config::load(const std::string& path) {
             auto alerts = yaml["alerts"];
             if (alerts["db_path"]) config.alert_db_path = alerts["db_path"].as<std::string>();
             if (alerts["retention_hours"]) config.alert_retention_hours = alerts["retention_hours"].as<int>();
+            if (alerts["enable_ai"]) config.enable_ai_alerts = alerts["enable_ai"].as<bool>();
         }
         
         // Rate limiting
@@ -145,6 +146,7 @@ bool Config::save(const std::string& path) const {
         out << YAML::Key << "alerts" << YAML::Value << YAML::BeginMap;
         out << YAML::Key << "db_path" << YAML::Value << alert_db_path;
         out << YAML::Key << "retention_hours" << YAML::Value << alert_retention_hours;
+        out << YAML::Key << "enable_ai" << YAML::Value << enable_ai_alerts;
         out << YAML::EndMap;
         
         // Rate limiting

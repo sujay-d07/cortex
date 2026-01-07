@@ -114,13 +114,16 @@ int main(int argc, char* argv[]) {
         config.max_requests_per_sec
     );
     
-    auto system_monitor = std::make_unique<SystemMonitor>(alert_manager);
+    // Create LLM engine first so we can pass it to the monitor
     auto llm_engine = std::make_unique<LLMEngine>();
+    auto* llm_ptr = llm_engine.get();
+    
+    // Create system monitor with LLM engine for AI-powered alerts
+    auto system_monitor = std::make_unique<SystemMonitor>(alert_manager, llm_ptr);
     
     // Get raw pointers before moving
     auto* ipc_ptr = ipc_server.get();
     auto* monitor_ptr = system_monitor.get();
-    auto* llm_ptr = llm_engine.get();
     
     // Register IPC handlers
     Handlers::register_all(*ipc_ptr, *monitor_ptr, *llm_ptr, alert_manager);

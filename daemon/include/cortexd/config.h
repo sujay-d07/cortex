@@ -47,6 +47,7 @@ struct Config {
     // Alert configuration
     std::string alert_db_path = DEFAULT_ALERT_DB;
     int alert_retention_hours = ALERT_RETENTION_HOURS;
+    bool enable_ai_alerts = true;  // Use LLM to generate intelligent alert messages
     
     // Rate limiting
     int max_requests_per_sec = MAX_REQUESTS_PER_SECOND;

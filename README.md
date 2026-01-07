@@ -263,7 +263,12 @@ sudo ./scripts/install.sh
 # Verify it's running
 cortex daemon status
 cortex daemon health
+
+# (Optional) Load an LLM for AI-enhanced alerts
+cortex daemon llm load ~/.cortex/models/your-model.gguf
 ```
+
+> **💡 AI-Enhanced Alerts**: When an LLM is loaded, alerts automatically include intelligent analysis with actionable recommendations (e.g., specific commands to free disk space). This feature is enabled by default.
 
 ### CLI Commands
 
@@ -277,6 +282,11 @@ cortex daemon alerts --dismiss <id>       # Dismiss a specific alert
 cortex daemon reload-config       # Reload configuration
 cortex daemon install             # Install daemon service
 cortex daemon uninstall           # Uninstall daemon service
+
+# LLM Management (for AI-enhanced alerts)
+cortex daemon llm status          # Check if LLM is loaded
+cortex daemon llm load <path>     # Load a GGUF model
+cortex daemon llm unload          # Unload current model
 ```
 
 ### Features
@@ -284,6 +294,7 @@ cortex daemon uninstall           # Uninstall daemon service
 | Feature | Description |
 |---------|-------------|
 | **System Monitoring** | CPU, memory, disk usage with configurable thresholds |
+| **AI-Enhanced Alerts** | Intelligent analysis with actionable recommendations (enabled by default) |
 | **Alert Management** | Create, query, acknowledge, dismiss alerts (SQLite-backed) |
 | **LLM Integration** | llama.cpp with 1000+ GGUF model support |
 | **IPC Protocol** | JSON-RPC via Unix socket (`/run/cortex/cortex.sock`) |

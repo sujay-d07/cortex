@@ -10,6 +10,7 @@
 - 🤖 **Embedded LLM**: llama.cpp integration for local inference
 - 📊 **System Monitoring**: CPU, memory, disk, APT updates, CVE scanning
 - 🔔 **Smart Alerts**: SQLite-persisted alerts with deduplication
+- 🧠 **AI-Enhanced Alerts**: Intelligent analysis with actionable recommendations (enabled by default)
 - ⚙️ **systemd Integration**: Type=notify, watchdog, journald logging
 
 ## Quick Start
@@ -197,8 +198,54 @@ thresholds:
 alerts:
   db_path: ~/.cortex/alerts.db
   retention_hours: 168
+  enable_ai: true  # AI-enhanced alerts (default: true)
 
 log_level: 1  # 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR
+```
+
+## AI-Enhanced Alerts
+
+When an LLM model is loaded, cortexd automatically generates intelligent, context-aware alerts with actionable recommendations. This feature is **enabled by default**.
+
+### How It Works
+
+1. **System monitoring** detects threshold violations (disk, memory, security updates)
+2. **Alert context** is gathered (usage %, available space, package list)
+3. **LLM analyzes** the context and generates specific recommendations
+4. **Enhanced alert** is created with both basic info and AI analysis
+
+### Example Output
+
+**Standard alert:**
+```
+⚠️  High disk usage
+Disk usage is at 85% on root filesystem
+```
+
+**AI-enhanced alert:**
+```
+⚠️  High disk usage
+Disk usage is at 85% on root filesystem
+
+💡 AI Analysis:
+Your disk is filling up quickly. Run `du -sh /* | sort -hr | head -10` 
+to find large directories. Consider clearing old logs with 
+`sudo journalctl --vacuum-time=7d` or removing unused packages with 
+`sudo apt autoremove`.
+```
+
+### Requirements
+
+- LLM model must be loaded (`cortex daemon llm load <model.gguf>`)
+- `enable_ai: true` in alerts config (default)
+
+### Disabling AI Alerts
+
+To use basic alerts without AI analysis:
+
+```yaml
+alerts:
+  enable_ai: false
 ```
 
 ## Building from Source

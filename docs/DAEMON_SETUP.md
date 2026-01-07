@@ -89,6 +89,7 @@ memory_limit_mb: 150
 | `log_level` | int | 1 | Log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR) |
 | `max_inference_queue_size` | int | 100 | Maximum queued inference requests |
 | `memory_limit_mb` | int | 150 | Memory limit in MB |
+| `enable_ai_alerts` | bool | true | Enable AI-enhanced alerts with LLM analysis |
 
 ## LLM Model Setup
 
@@ -146,6 +147,53 @@ cortex daemon health
 
 # Watch logs during inference
 journalctl -u cortexd -f
+```
+
+## AI-Enhanced Alerts
+
+Cortexd features intelligent, AI-powered alerts that provide actionable recommendations. This feature is **enabled by default** when an LLM model is loaded.
+
+### Features
+
+- **Context-aware analysis**: The LLM receives detailed system metrics for accurate recommendations
+- **Type-specific prompts**: Different analysis for disk, memory, and security alerts
+- **Actionable suggestions**: Provides specific commands and steps to resolve issues
+- **Graceful fallback**: If LLM is unavailable, standard alerts are still generated
+
+### Example
+
+When disk usage exceeds the warning threshold, you'll see:
+
+```
+⚠️  High disk usage
+Disk usage is at 85% on root filesystem
+
+💡 AI Analysis:
+Your disk is filling up quickly. Run `du -sh /* | sort -hr | head -10` 
+to find large directories. Consider clearing old logs with 
+`sudo journalctl --vacuum-time=7d` or removing unused packages with 
+`sudo apt autoremove`.
+```
+
+### Configuration
+
+AI alerts are enabled by default. To disable:
+
+```yaml
+# In ~/.cortex/daemon.conf or /etc/cortex/cortexd.yaml
+alerts:
+  enable_ai: false
+```
+
+### Viewing AI-Enhanced Alerts
+
+```bash
+# View all alerts (AI-enhanced alerts show 💡 AI Analysis section)
+cortex daemon alerts
+
+# Check daemon logs to see AI generation
+journalctl -u cortexd -f
+# Look for: "Generating AI alert analysis..." and "AI analysis generated in XXXms"
 ```
 
 ## Usage
