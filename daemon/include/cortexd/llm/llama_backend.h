@@ -108,6 +108,11 @@ private:
      * @brief Convert single token to string
      */
     std::string token_to_piece(llama_token token) const;
+    
+    /**
+     * @brief Internal unload (assumes mutex is already held)
+     */
+    void unload_internal();
 };
 
 } // namespace cortexd

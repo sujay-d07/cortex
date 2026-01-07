@@ -40,9 +40,12 @@ class CortexDaemonClient:
         self.socket_path = socket_path
         self.timeout = timeout
 
-    def _connect(self) -> socket.socket:
+    def _connect(self, timeout: Optional[float] = None) -> socket.socket:
         """
         Create and connect Unix socket.
+
+        Args:
+            timeout: Socket timeout in seconds (uses default if None)
 
         Returns:
             Connected socket object
@@ -58,19 +61,25 @@ class CortexDaemonClient:
 
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(self.timeout)
+            sock.settimeout(timeout if timeout is not None else self.timeout)
             sock.connect(self.socket_path)
             return sock
         except socket.error as e:
             raise DaemonConnectionError(f"Failed to connect to daemon: {e}")
 
-    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _send_request(
+        self, 
+        method: str, 
+        params: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Send request to daemon and receive response.
 
         Args:
             method: Method name (status, health, alerts, etc)
             params: Optional method parameters
+            timeout: Custom timeout for long-running operations (uses default if None)
 
         Returns:
             Response dictionary with 'success' and 'result' or 'error'
@@ -89,7 +98,7 @@ class CortexDaemonClient:
         logger.debug(f"Sending: {request_json}")
 
         try:
-            sock = self._connect()
+            sock = self._connect(timeout)
             sock.sendall(request_json.encode('utf-8'))
 
             # Receive response
@@ -323,6 +332,9 @@ class CortexDaemonClient:
         response = self._send_request("llm.status")
         return self._check_response(response)
 
+    # Timeout for model loading (can take 30-120+ seconds for large models)
+    MODEL_LOAD_TIMEOUT = 120.0
+
     def load_model(self, model_path: str) -> Dict[str, Any]:
         """
         Load an LLM model.
@@ -333,7 +345,11 @@ class CortexDaemonClient:
         Returns:
             Model info dictionary
         """
-        response = self._send_request("llm.load", {"model_path": model_path})
+        response = self._send_request(
+            "llm.load", 
+            {"model_path": model_path},
+            timeout=self.MODEL_LOAD_TIMEOUT
+        )
         return self._check_response(response)
 
     def unload_model(self) -> bool:
@@ -349,6 +365,9 @@ class CortexDaemonClient:
             return result.get("unloaded", False)
         except DaemonProtocolError:
             return False
+
+    # Timeout for inference (depends on max_tokens and model size)
+    INFERENCE_TIMEOUT = 60.0
 
     def infer(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7, 
               top_p: float = 0.9, stop: Optional[str] = None) -> Dict[str, Any]:
@@ -374,7 +393,7 @@ class CortexDaemonClient:
         if stop:
             params["stop"] = stop
 
-        response = self._send_request("llm.infer", params)
+        response = self._send_request("llm.infer", params, timeout=self.INFERENCE_TIMEOUT)
         return self._check_response(response)
 
     # Convenience methods

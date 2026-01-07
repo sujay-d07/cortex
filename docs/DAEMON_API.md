@@ -147,11 +147,12 @@ Get active system alerts.
         "severity": "warning",
         "type": "memory_usage",
         "title": "High Memory Usage",
-        "description": "Memory usage at 87%, consider freeing space",
+        "description": "Memory usage at 87%\n\n💡 AI Analysis:\nHigh memory pressure detected. Run `ps aux --sort=-%mem | head -10` to identify memory-hungry processes. Consider restarting browser tabs or closing unused applications.",
         "acknowledged": false,
         "metadata": {
           "usage_percent": "87",
-          "threshold": "85"
+          "threshold": "85",
+          "ai_enhanced": "true"
         }
       }
     ],
@@ -168,9 +169,12 @@ Get active system alerts.
 - `severity` (string): `info`, `warning`, `error`, `critical`
 - `type` (string): Alert category
 - `title` (string): Human-readable title
-- `description` (string): Detailed description
+- `description` (string): Detailed description (may include AI analysis if enabled)
 - `acknowledged` (bool): Has alert been acknowledged
 - `metadata` (object): Additional alert data
+  - `ai_enhanced` (string): `"true"` if alert includes AI analysis
+
+> **Note**: When an LLM is loaded and `enable_ai_alerts` is `true` (the default), alert descriptions automatically include a `💡 AI Analysis` section with actionable recommendations.
 
 ### 4. Acknowledge Alert
 

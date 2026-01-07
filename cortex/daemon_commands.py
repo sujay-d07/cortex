@@ -8,7 +8,7 @@ import subprocess
 from typing import Optional
 from pathlib import Path
 from rich.console import Console
-from rich.table import Table
+# Table import removed - alerts now use custom formatting for AI analysis
 from rich.panel import Panel
 from rich import print as rprint
 
@@ -180,32 +180,64 @@ class DaemonManager:
                 console.print("[green]✓ No active alerts[/green]")
                 return 0
 
-            # Display alerts in table
-            table = Table(title=f"Active Alerts ({len(alerts)})")
-            table.add_column("ID", style="dim", width=10)
-            table.add_column("Severity", width=10)
-            table.add_column("Type", width=15)
-            table.add_column("Title", width=30)
-            table.add_column("Message", width=40)
+            console.print(f"\n[bold]Active Alerts ({len(alerts)})[/bold]\n")
 
             for alert in alerts:
                 severity_val = alert.get("severity", "info")
                 severity_style = {
                     "info": "blue",
-                    "warning": "yellow",
+                    "warning": "yellow", 
                     "error": "red",
                     "critical": "red bold"
                 }.get(severity_val, "white")
+                
+                alert_id = alert.get("id", "")[:8]
+                alert_type = alert.get("type", "unknown")
+                title = alert.get("title", "")
+                message = alert.get("message", "")
+                metadata = alert.get("metadata", {})
+                is_ai_enhanced = metadata.get("ai_enhanced") == "true"
+                
+                # Severity icon
+                severity_icon = {
+                    "info": "ℹ️ ",
+                    "warning": "⚠️ ",
+                    "error": "❌",
+                    "critical": "🚨"
+                }.get(severity_val, "•")
+                
+                # Print alert header
+                console.print(f"{severity_icon} [{severity_style}][bold]{title}[/bold][/{severity_style}]")
+                console.print(f"   [dim]ID: {alert_id}... | Type: {alert_type} | Severity: {severity_val}[/dim]")
+                
+                # Check if message contains AI analysis
+                if "💡 AI Analysis:" in message:
+                    # Split into basic message and AI analysis
+                    parts = message.split("\n\n💡 AI Analysis:\n", 1)
+                    basic_msg = parts[0]
+                    ai_analysis = parts[1] if len(parts) > 1 else ""
+                    
+                    # Print basic message
+                    console.print(f"   {basic_msg}")
+                    
+                    # Print AI analysis in a highlighted box
+                    if ai_analysis:
+                        console.print()
+                        console.print("   [cyan]💡 AI Analysis:[/cyan]")
+                        # Indent each line of AI analysis
+                        for line in ai_analysis.strip().split("\n"):
+                            console.print(f"   [italic]{line}[/italic]")
+                else:
+                    # Print regular message
+                    for line in message.split("\n"):
+                        console.print(f"   {line}")
+                
+                # Add badge for AI-enhanced alerts
+                if is_ai_enhanced:
+                    console.print("   [dim cyan]🤖 AI-enhanced[/dim cyan]")
+                
+                console.print()  # Blank line between alerts
 
-                table.add_row(
-                    alert.get("id", "")[:8] + "...",
-                    f"[{severity_style}]{severity_val}[/{severity_style}]",
-                    alert.get("type", "unknown"),
-                    alert.get("title", "")[:30],
-                    alert.get("message", "")[:40]
-                )
-
-            console.print(table)
             return 0
 
         except DaemonConnectionError as e:
@@ -356,6 +388,7 @@ class DaemonManager:
             return 1
 
         console.print(f"[cyan]Loading model: {model_path}[/cyan]")
+        console.print("[dim]This may take a minute depending on model size...[/dim]")
 
         try:
             result = self.client.load_model(model_path)

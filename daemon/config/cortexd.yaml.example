@@ -50,6 +50,9 @@ alerts:
   db_path: ~/.cortex/alerts.db
   # Alert retention period in hours (7 days)
   retention_hours: 168
+  # Enable AI-powered alert analysis (requires LLM model loaded)
+  # When enabled, alerts include intelligent suggestions from the LLM
+  enable_ai: true
 
 # Rate limiting
 rate_limit:
