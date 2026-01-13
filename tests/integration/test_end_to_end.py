@@ -7,6 +7,8 @@ import os
 import unittest
 from pathlib import Path
 
+import pytest
+
 from .docker_utils import DockerRunResult, docker_available, run_in_docker
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -103,8 +105,15 @@ class TestEndToEndWorkflows(unittest.TestCase):
         self.assertTrue(result.succeeded(), msg=result.stderr)
         self.assertIn("STEPS 1", result.stdout)
 
+    @pytest.mark.timeout(300)
     def test_project_tests_run_inside_container(self):
-        """The unified test runner should pass within the container."""
+        """The unified test runner should pass within the container.
+
+        This test runs a subset of unit tests inside a clean Docker container
+        to verify that the project can be installed and tested in isolation.
+        We run only a small subset to keep the test fast while still validating
+        the container setup.
+        """
 
         env = {
             "CORTEX_PROVIDER": "fake",
@@ -113,9 +122,11 @@ class TestEndToEndWorkflows(unittest.TestCase):
         # Use PIP_BOOTSTRAP_DEV to install pytest and other dev dependencies
         effective_env = dict(BASE_ENV)
         effective_env.update(env)
+        # Run only a subset of unit tests to verify container setup without
+        # duplicating the entire test suite (which is already run natively)
         result = run_in_docker(
             DEFAULT_IMAGE,
-            f"{PIP_BOOTSTRAP_DEV} && pytest tests/ -v --ignore=tests/integration",
+            f"{PIP_BOOTSTRAP_DEV} && pytest tests/unit/ -v --ignore=tests/integration",
             env=effective_env,
             mounts=[MOUNT],
             workdir="/workspace",

@@ -46,7 +46,12 @@ Alert Alert::from_json(const json& j) {
     
     if (j.contains("metadata")) {
         for (auto& [key, value] : j["metadata"].items()) {
-            alert.metadata[key] = value.get<std::string>();
+            if (value.is_string()) {
+                alert.metadata[key] = value.get<std::string>();
+            } else {
+                // Convert non-string values to their string representation
+                alert.metadata[key] = value.dump();
+            }
         }
     }
     
