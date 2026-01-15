@@ -6,8 +6,6 @@
 #include "cortexd/core/daemon.h"
 #include "cortexd/ipc/server.h"
 #include "cortexd/ipc/handlers.h"
-#include "cortexd/monitor/system_monitor.h"
-#include "cortexd/alerts/alert_manager.h"
 #include "cortexd/logger.h"
 #include "cortexd/config.h"
 #include "cortexd/common.h"
@@ -104,28 +102,17 @@ int main(int argc, char* argv[]) {
     // Get configuration
     const auto& config = ConfigManager::instance().get();
     
-    // Create alert manager (shared)
-    auto alert_manager = std::make_shared<AlertManager>(config.alert_db_path);
-    
-    // Create services
+    // Create IPC server
     auto ipc_server = std::make_unique<IPCServer>(
         config.socket_path,
         config.max_requests_per_sec
     );
     
-    // Create system monitor (uses HTTP LLM client for AI-powered alerts)
-    auto system_monitor = std::make_unique<SystemMonitor>(alert_manager);
-    
-    // Get raw pointers before moving
-    auto* ipc_ptr = ipc_server.get();
-    auto* monitor_ptr = system_monitor.get();
-    
     // Register IPC handlers
-    Handlers::register_all(*ipc_ptr, *monitor_ptr, alert_manager);
+    Handlers::register_all(*ipc_server);
     
     // Register services with daemon
     daemon.register_service(std::move(ipc_server));
-    daemon.register_service(std::move(system_monitor));
     
     // Run daemon (blocks until shutdown)
     int exit_code = daemon.run();

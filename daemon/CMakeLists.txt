@@ -44,19 +44,8 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SYSTEMD REQUIRED libsystemd)
 pkg_check_modules(OPENSSL REQUIRED openssl)
-pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 pkg_check_modules(UUID REQUIRED uuid)
-pkg_check_modules(CURL REQUIRED libcurl)
 
-# Find llama.cpp
-find_library(LLAMA_LIB llama PATHS /usr/local/lib /usr/lib)
-find_path(LLAMA_INCLUDE llama.h PATHS /usr/local/include /usr/include)
-
-if(NOT LLAMA_LIB)
-    message(WARNING "llama.cpp not found. LLM features will be limited.")
-    message(STATUS "Install from: https://github.com/ggerganov/llama.cpp")
-    set(LLAMA_LIB "")
-endif()
 
 # Fetch nlohmann/json
 include(FetchContent)
@@ -83,14 +72,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${SYSTEMD_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
-    ${SQLITE3_INCLUDE_DIRS}
     ${UUID_INCLUDE_DIRS}
-    ${CURL_INCLUDE_DIRS}
 )
-
-if(LLAMA_INCLUDE)
-    include_directories(${LLAMA_INCLUDE})
-endif()
 
 # Source files
 set(DAEMON_SOURCES
@@ -105,20 +88,6 @@ set(DAEMON_SOURCES
     src/ipc/server.cpp
     src/ipc/protocol.cpp
     src/ipc/handlers.cpp
-    
-    # Monitoring
-    src/monitor/system_monitor.cpp
-    src/monitor/memory_monitor.cpp
-    src/monitor/disk_monitor.cpp
-    src/monitor/apt_monitor.cpp
-    src/monitor/cve_scanner.cpp
-    
-    # LLM (HTTP client for external LLM services)
-    src/llm/http_llm_client.cpp
-    
-    # Alerts
-    src/alerts/alert_manager.cpp
-    src/alerts/alert_store.cpp
     
     # Utils
     src/utils/logger.cpp
@@ -137,22 +106,11 @@ target_link_libraries(cortexd
     PRIVATE
     ${SYSTEMD_LIBRARIES}
     ${OPENSSL_LIBRARIES}
-    ${SQLITE3_LIBRARIES}
     ${UUID_LIBRARIES}
-    ${CURL_LIBRARIES}
     nlohmann_json::nlohmann_json
     yaml-cpp::yaml-cpp
     pthread
 )
-
-# Link llama.cpp if available
-if(LLAMA_LIB)
-    target_link_libraries(cortexd PRIVATE ${LLAMA_LIB})
-    target_compile_definitions(cortexd PRIVATE HAVE_LLAMA_CPP=1)
-    message(STATUS "Linked llama.cpp: ${LLAMA_LIB}")
-else()
-    target_compile_definitions(cortexd PRIVATE HAVE_LLAMA_CPP=0)
-endif()
 
 # Static build option
 if(BUILD_STATIC AND NOT LLAMA_LIB)
@@ -188,7 +146,6 @@ message(STATUS "C++ Standard:   ${CMAKE_CXX_STANDARD}")
 message(STATUS "Static build:   ${BUILD_STATIC}")
 message(STATUS "Tests:          ${BUILD_TESTS}")
 message(STATUS "Sanitizers:     ${ENABLE_SANITIZERS}")
-message(STATUS "llama.cpp:      ${LLAMA_LIB}")
 message(STATUS "")
 
 # Tests (optional)
