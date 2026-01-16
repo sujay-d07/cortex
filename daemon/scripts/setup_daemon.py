@@ -277,19 +277,43 @@ def clean_build() -> None:
         None
     """
     build_dir = DAEMON_DIR / "build"
-    if build_dir.exists():
-        console.print(f"[cyan]Removing previous build directory: {build_dir}[/cyan]")
-        result = subprocess.run(
-            ["sudo", "rm", "-rf", str(build_dir)],
-            capture_output=True,
-            text=True,
-            check=False,
+    if not build_dir.exists():
+        # Log cancelled operation
+        log_audit_event(
+            "clean_build",
+            f"Build directory does not exist: {build_dir}",
+            success=True,
         )
-        if result.returncode != 0:
-            console.print("[red]Failed to remove previous build directory.[/red]")
-            if result.stderr:
-                console.print(f"[dim]Error: {result.stderr.strip()}[/dim]")
-            sys.exit(1)
+        return
+
+    console.print(f"[cyan]Removing previous build directory: {build_dir}[/cyan]")
+    result = subprocess.run(
+        ["sudo", "rm", "-rf", str(build_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        # Log successful removal
+        log_audit_event(
+            "clean_build",
+            f"Successfully removed build directory: {build_dir}",
+            success=True,
+        )
+    else:
+        # Log failure before exiting
+        error_details = f"returncode={result.returncode}"
+        if result.stderr:
+            error_details += f", stderr={result.stderr[:500]}"
+        log_audit_event(
+            "clean_build",
+            f"Failed to remove build directory: {build_dir}, {error_details}",
+            success=False,
+        )
+        console.print("[red]Failed to remove previous build directory.[/red]")
+        if result.stderr:
+            console.print(f"[dim]Error: {result.stderr.strip()}[/dim]")
+        sys.exit(1)
 
 
 def build_daemon(with_tests: bool = False) -> bool:

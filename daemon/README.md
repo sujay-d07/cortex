@@ -65,7 +65,7 @@ echo '{"method":"ping"}' | socat - UNIX-CONNECT:/run/cortex/cortex.sock
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     cortex CLI (Python)                      │
 └───────────────────────────┬─────────────────────────────────┘
@@ -88,7 +88,7 @@ echo '{"method":"ping"}' | socat - UNIX-CONNECT:/run/cortex/cortex.sock
 
 ## Directory Structure
 
-```
+```text
 daemon/
 ├── include/cortexd/          # Public headers
 │   ├── common.h              # Types, constants
@@ -247,7 +247,7 @@ make -j$(nproc)
 
 Tests run against a **static library** (`cortexd_lib`) containing all daemon code, allowing testing without installing the daemon as a systemd service.
 
-```
+```text
 ┌──────────────────────────────────────────────────────────┐
 │                    Test Executable                        │
 │                   (e.g., test_config)                     │
@@ -412,5 +412,5 @@ Apache 2.0 - See [LICENSE](../LICENSE)
 
 ## Support
 
-- Issues: https://github.com/cortexlinux/cortex/issues
-- Discord: https://discord.gg/uCqHvxjU83
+- Issues: [Github Issues](https://github.com/cortexlinux/cortex/issues)
+- Discord: [Discord](https://discord.gg/uCqHvxjU83)

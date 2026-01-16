@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <atomic>
+#include <unistd.h>
 #include "cortexd/core/daemon.h"
 #include "cortexd/core/service.h"
 #include "cortexd/config.h"
@@ -143,9 +144,9 @@ TEST_F(DaemonTest, RequestShutdownSetsFlag) {
     auto& daemon = cortexd::Daemon::instance();
     daemon.initialize(config_path_);
     
-    // Note: Since Daemon is a singleton, the shutdown_requested_ flag may already
-    // be set from a previous test's TearDown. We test that request_shutdown()
-    // results in the flag being true (idempotent behavior).
+    // The test fixture resets the Daemon in TearDown(), so prior-test state is not possible.
+    // This test verifies that request_shutdown() sets shutdown_requested_ to true and
+    // is idempotent on a freshly reset singleton.
     daemon.request_shutdown();
     
     EXPECT_TRUE(daemon.shutdown_requested());

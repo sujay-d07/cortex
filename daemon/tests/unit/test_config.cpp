@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 #include <fstream>
 #include <filesystem>
+#include <chrono>
+#include <unistd.h>
 #include "cortexd/config.h"
 #include "cortexd/logger.h"
 
@@ -17,8 +19,8 @@ protected:
         // Initialize logger in non-journald mode for tests
         cortexd::Logger::init(cortexd::LogLevel::ERROR, false);
         
-        // Create a temp directory for test files
-        temp_dir_ = fs::temp_directory_path() / "cortexd_test";
+        // Create a temp directory for test files with unique suffix to avoid collisions
+        temp_dir_ = fs::temp_directory_path() / ("cortexd_test_" + std::to_string(getpid()) + "_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         fs::create_directories(temp_dir_);
     }
     

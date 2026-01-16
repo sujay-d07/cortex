@@ -2912,13 +2912,35 @@ class CortexCLI:
 
         cx_header("Installing Cortex Daemon")
 
+        # Initialize audit logging
+        history = InstallationHistory()
+        start_time = datetime.now(timezone.utc)
+        install_id = None
+
+        try:
+            # Record operation start
+            install_id = history.record_installation(
+                InstallationType.CONFIG,
+                ["cortexd"],
+                ["cortex daemon install"],
+                start_time,
+            )
+        except Exception as e:
+            cx_print(f"Warning: Could not initialize audit logging: {e}", "warning")
+
         # Find setup_daemon.py
         daemon_dir = Path(__file__).parent.parent / "daemon"
         setup_script = daemon_dir / "scripts" / "setup_daemon.py"
 
         if not setup_script.exists():
-            cx_print(f"Setup script not found at {setup_script}", "error")
+            error_msg = f"Setup script not found at {setup_script}"
+            cx_print(error_msg, "error")
             cx_print("Please ensure the daemon directory is present.", "error")
+            if install_id:
+                try:
+                    history.update_installation(install_id, InstallationStatus.FAILED, error_msg)
+                except Exception:
+                    pass
             return 1
 
         execute = getattr(args, "execute", False)
@@ -2934,16 +2956,57 @@ class CortexCLI:
             cx_print("", "info")
             cx_print("Run with --execute to proceed:", "info")
             cx_print("  cortex daemon install --execute", "dim")
+            if install_id:
+                try:
+                    history.update_installation(
+                        install_id,
+                        InstallationStatus.FAILED,
+                        "Operation cancelled (no --execute flag)",
+                    )
+                except Exception:
+                    pass
             return 0
 
         # Run setup_daemon.py
         cx_print("Running daemon setup wizard...", "info")
-        result = subprocess.run(
-            [sys.executable, str(setup_script)],
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                [sys.executable, str(setup_script)],
+                check=False,
+            )
 
-        return result.returncode
+            # Record completion
+            if install_id:
+                try:
+                    if result.returncode == 0:
+                        history.update_installation(install_id, InstallationStatus.SUCCESS)
+                    else:
+                        error_msg = f"Setup script returned exit code {result.returncode}"
+                        history.update_installation(
+                            install_id, InstallationStatus.FAILED, error_msg
+                        )
+                except Exception:
+                    pass
+
+            return result.returncode
+        except subprocess.SubprocessError as e:
+            error_msg = f"Subprocess error during daemon install: {str(e)}"
+            cx_print(error_msg, "error")
+            if install_id:
+                try:
+                    history.update_installation(install_id, InstallationStatus.FAILED, error_msg)
+                except Exception:
+                    pass
+            return 1
+        except Exception as e:
+            error_msg = f"Unexpected error during daemon install: {str(e)}"
+            cx_print(error_msg, "error")
+            if install_id:
+                try:
+                    history.update_installation(install_id, InstallationStatus.FAILED, error_msg)
+                except Exception:
+                    pass
+            return 1
 
     def _daemon_uninstall(self, args: argparse.Namespace) -> int:
         """Uninstall the cortexd daemon."""
@@ -2951,6 +3014,22 @@ class CortexCLI:
         from pathlib import Path
 
         cx_header("Uninstalling Cortex Daemon")
+
+        # Initialize audit logging
+        history = InstallationHistory()
+        start_time = datetime.now(timezone.utc)
+        install_id = None
+
+        try:
+            # Record operation start
+            install_id = history.record_installation(
+                InstallationType.CONFIG,
+                ["cortexd"],
+                ["cortex daemon uninstall"],
+                start_time,
+            )
+        except Exception as e:
+            cx_print(f"Warning: Could not initialize audit logging: {e}", "warning")
 
         execute = getattr(args, "execute", False)
 
@@ -2965,6 +3044,15 @@ class CortexCLI:
             cx_print("", "info")
             cx_print("Run with --execute to proceed:", "info")
             cx_print("  cortex daemon uninstall --execute", "dim")
+            if install_id:
+                try:
+                    history.update_installation(
+                        install_id,
+                        InstallationStatus.FAILED,
+                        "Operation cancelled (no --execute flag)",
+                    )
+                except Exception:
+                    pass
             return 0
 
         # Find uninstall script
@@ -2973,11 +3061,62 @@ class CortexCLI:
 
         if uninstall_script.exists():
             cx_print("Running uninstall script...", "info")
-            result = subprocess.run(
-                ["sudo", "bash", str(uninstall_script)],
-                check=False,
-            )
-            return result.returncode
+            try:
+                # Log the uninstall script command
+                if install_id:
+                    try:
+                        history.record_installation(
+                            InstallationType.CONFIG,
+                            ["cortexd"],
+                            [f"sudo bash {uninstall_script}"],
+                            datetime.now(timezone.utc),
+                        )
+                    except Exception:
+                        pass
+
+                result = subprocess.run(
+                    ["sudo", "bash", str(uninstall_script)],
+                    check=False,
+                )
+
+                # Record completion
+                if install_id:
+                    try:
+                        if result.returncode == 0:
+                            history.update_installation(install_id, InstallationStatus.SUCCESS)
+                        else:
+                            error_msg = f"Uninstall script returned exit code {result.returncode}"
+                            if result.stderr:
+                                error_msg += f": {result.stderr[:500]}"
+                            history.update_installation(
+                                install_id, InstallationStatus.FAILED, error_msg
+                            )
+                    except Exception:
+                        pass
+
+                return result.returncode
+            except subprocess.SubprocessError as e:
+                error_msg = f"Subprocess error during daemon uninstall: {str(e)}"
+                cx_print(error_msg, "error")
+                if install_id:
+                    try:
+                        history.update_installation(
+                            install_id, InstallationStatus.FAILED, error_msg
+                        )
+                    except Exception:
+                        pass
+                return 1
+            except Exception as e:
+                error_msg = f"Unexpected error during daemon uninstall: {str(e)}"
+                cx_print(error_msg, "error")
+                if install_id:
+                    try:
+                        history.update_installation(
+                            install_id, InstallationStatus.FAILED, error_msg
+                        )
+                    except Exception:
+                        pass
+                return 1
         else:
             # Manual uninstall
             cx_print("Running manual uninstall...", "info")
@@ -2990,12 +3129,71 @@ class CortexCLI:
                 ["sudo", "systemctl", "daemon-reload"],
             ]
 
-            for cmd in commands:
-                cx_print(f"  Running: {' '.join(cmd)}", "dim")
-                subprocess.run(cmd, check=False, capture_output=True)
+            try:
+                for cmd in commands:
+                    cmd_str = " ".join(cmd)
+                    cx_print(f"  Running: {cmd_str}", "dim")
 
-            cx_print("Daemon uninstalled.", "success")
-            return 0
+                    # Log each critical command before execution
+                    if install_id:
+                        try:
+                            history.record_installation(
+                                InstallationType.CONFIG,
+                                ["cortexd"],
+                                [cmd_str],
+                                datetime.now(timezone.utc),
+                            )
+                        except Exception:
+                            pass
+
+                    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+                    # Log after execution if there was an error
+                    if result.returncode != 0 and install_id:
+                        try:
+                            error_msg = (
+                                f"Command '{cmd_str}' failed with return code {result.returncode}"
+                            )
+                            if result.stderr:
+                                error_msg += f": {result.stderr[:500]}"
+                            history.update_installation(
+                                install_id, InstallationStatus.FAILED, error_msg
+                            )
+                        except Exception:
+                            pass
+
+                cx_print("Daemon uninstalled.", "success")
+
+                # Record success
+                if install_id:
+                    try:
+                        history.update_installation(install_id, InstallationStatus.SUCCESS)
+                    except Exception:
+                        pass
+
+                return 0
+            except subprocess.SubprocessError as e:
+                error_msg = f"Subprocess error during manual uninstall: {str(e)}"
+                cx_print(error_msg, "error")
+                if install_id:
+                    try:
+                        history.update_installation(
+                            install_id, InstallationStatus.FAILED, error_msg
+                        )
+                    except Exception:
+                        pass
+                return 1
+            except Exception as e:
+                error_msg = f"Unexpected error during manual uninstall: {str(e)}"
+                cx_print(error_msg, "error")
+                if install_id:
+                    try:
+                        history.update_installation(
+                            install_id, InstallationStatus.FAILED, error_msg
+                        )
+                    except Exception:
+                        pass
+                return 1
 
     def _daemon_config(self) -> int:
         """Get daemon configuration via IPC."""

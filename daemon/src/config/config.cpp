@@ -188,6 +188,10 @@ bool ConfigManager::reload() {
     
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (config_path_ != path_copy) {
+            LOG_WARN("ConfigManager", "Config path changed during reload; aborting");
+            return false;
+        }
         config_ = *loaded;
         
         // Copy for callback invocation outside the lock

@@ -67,20 +67,20 @@
      log(LogLevel::CRITICAL, component, message);
  }
  
- void Logger::log(LogLevel level, const std::string& component, const std::string& message) {
-     // Check log level before acquiring lock
-     if (static_cast<int>(level) < static_cast<int>(min_level_)) {
-         return;
-     }
-     
-     std::lock_guard<std::mutex> lock(mutex_);
-     
-     if (use_journald_) {
-         log_to_journald(level, component, message);
-     } else {
-         log_to_stderr(level, component, message);
-     }
- }
+void Logger::log(LogLevel level, const std::string& component, const std::string& message) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Check log level while holding the lock to avoid race condition
+    if (static_cast<int>(level) < static_cast<int>(min_level_)) {
+        return;
+    }
+    
+    if (use_journald_) {
+        log_to_journald(level, component, message);
+    } else {
+        log_to_stderr(level, component, message);
+    }
+}
  
  void Logger::log_to_journald(LogLevel level, const std::string& component, const std::string& message) {
      sd_journal_send(

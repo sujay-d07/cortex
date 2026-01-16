@@ -112,8 +112,9 @@ target_link_libraries(cortexd
 )
 
 # Static build option
+# Use partial static linking to allow libsystemd to use dlopen
 if(BUILD_STATIC)
-    target_link_options(cortexd PRIVATE -static)
+    target_link_options(cortexd PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
 # Position independent code

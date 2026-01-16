@@ -139,18 +139,29 @@
          std::filesystem::create_directories(parent);
      }
      
-     // Bind socket
-     struct sockaddr_un addr;
-     memset(&addr, 0, sizeof(addr));
-     addr.sun_family = AF_UNIX;
-     strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
-     
-     if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-         LOG_ERROR("IPCServer", "Failed to bind socket: " + std::string(strerror(errno)));
-         close(server_fd_);
-         server_fd_ = -1;
-         return false;
-     }
+    // Bind socket
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    
+    // Check socket path length before copying to prevent silent truncation
+    if (socket_path_.size() > sizeof(addr.sun_path) - 1) {
+        LOG_ERROR("IPCServer", "Socket path too long: " + socket_path_ + " (max " + 
+                  std::to_string(sizeof(addr.sun_path) - 1) + " bytes)");
+        close(server_fd_);
+        server_fd_ = -1;
+        return false;
+    }
+    
+    strncpy(addr.sun_path, socket_path_.c_str(), sizeof(addr.sun_path) - 1);
+    addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';  // Ensure null termination
+    
+    if (bind(server_fd_, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        LOG_ERROR("IPCServer", "Failed to bind socket: " + std::string(strerror(errno)));
+        close(server_fd_);
+        server_fd_ = -1;
+        return false;
+    }
      
      // Listen
      if (listen(server_fd_, SOCKET_BACKLOG) == -1) {

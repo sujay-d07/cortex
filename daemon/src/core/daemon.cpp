@@ -77,10 +77,10 @@
      
      LOG_INFO("Daemon", "Daemon started successfully");
      
-     // Main event loop
-     while (!shutdown_requested_) {
-         event_loop();
-     }
+    // Main event loop
+    while (!shutdown_requested_.load(std::memory_order_relaxed)) {
+        event_loop();
+    }
      
      LOG_INFO("Daemon", "Shutdown requested, stopping services");
      
@@ -96,9 +96,9 @@
      return 0;
  }
  
- void Daemon::request_shutdown() {
-     shutdown_requested_ = true;
- }
+void Daemon::request_shutdown() {
+    shutdown_requested_.store(true, std::memory_order_relaxed);
+}
  
  void Daemon::register_service(std::unique_ptr<Service> service) {
      LOG_DEBUG("Daemon", "Registering service: " + std::string(service->name()));
@@ -131,6 +131,15 @@
 bool Daemon::reload_config() {
     LOG_INFO("Daemon", "Reloading configuration");
     if (ConfigManager::instance().reload()) {
+        // Reapply log level from config
+        const auto& config = ConfigManager::instance().get();
+        switch (config.log_level) {
+            case 0: Logger::set_level(LogLevel::DEBUG); break;
+            case 1: Logger::set_level(LogLevel::INFO); break;
+            case 2: Logger::set_level(LogLevel::WARN); break;
+            case 3: Logger::set_level(LogLevel::ERROR); break;
+            default: Logger::set_level(LogLevel::INFO); break;
+        }
         LOG_INFO("Daemon", "Configuration reloaded successfully");
         return true;
     }
@@ -149,8 +158,8 @@ void Daemon::reset() {
     services_.clear();
     
     // Reset state flags
-    shutdown_requested_ = false;
-    running_ = false;
+    shutdown_requested_.store(false, std::memory_order_relaxed);
+    running_.store(false, std::memory_order_relaxed);
     
     // Reset start time
     start_time_ = std::chrono::steady_clock::time_point{};
