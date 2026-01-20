@@ -338,6 +338,9 @@ class InstallationHistory:
 
                 packages = json.loads(result[0])
                 start_time = datetime.datetime.fromisoformat(result[1])
+                # Normalize start_time to UTC if it's naive
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
                 duration = (datetime.datetime.now(timezone.utc) - start_time).total_seconds()
 
                 # Create after snapshot
