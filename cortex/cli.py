@@ -4614,17 +4614,19 @@ def main():
         choices=["cpu", "memory", "disk", "apt", "cve", "service", "system"],
         help="Filter alerts by category",
     )
-    daemon_alerts_parser.add_argument(
+    # Mutually exclusive group for action flags
+    actions_group = daemon_alerts_parser.add_mutually_exclusive_group()
+    actions_group.add_argument(
         "--acknowledge-all",
         action="store_true",
         help="Acknowledge all active alerts",
     )
-    daemon_alerts_parser.add_argument(
+    actions_group.add_argument(
         "--dismiss-all",
         action="store_true",
         help="Dismiss all active and acknowledged alerts",
     )
-    daemon_alerts_parser.add_argument(
+    actions_group.add_argument(
         "--dismiss",
         metavar="UUID",
         help="Dismiss a specific alert by UUID",

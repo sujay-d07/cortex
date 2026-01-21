@@ -214,12 +214,7 @@ Response Handlers::handle_alerts_acknowledge(const Request& req, std::shared_ptr
             return Response::err("Alert not found or already acknowledged", ErrorCodes::ALERT_NOT_FOUND);
         }
     } else {
-        // Default: acknowledge all
-        size_t count = alerts->acknowledge_all();
-        return Response::ok({
-            {"acknowledged", count},
-            {"message", "Acknowledged " + std::to_string(count) + " alert(s)"}
-        });
+        return Response::err("Missing or invalid parameters: require 'uuid' or 'all'", ErrorCodes::INVALID_PARAMS);
     }
 }
 
