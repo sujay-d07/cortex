@@ -108,8 +108,23 @@ log_level: 1
         ASSERT_TRUE(server_->start());
         
         // Wait for monitor thread to start and run at least once to populate health data
-        // The monitor loop calls check_health() immediately when it starts
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        // Poll for health data readiness instead of fixed sleep
+        const auto timeout = std::chrono::seconds(5);
+        const auto poll_interval = std::chrono::milliseconds(100);
+        auto start_time = std::chrono::steady_clock::now();
+        bool health_ready = false;
+        
+        while (std::chrono::steady_clock::now() - start_time < timeout) {
+            auto health = system_monitor_->get_health();
+            // Check if health data is populated (monitor has run at least once)
+            if (health.cpu_cores > 0 || health.uptime_seconds > 0) {
+                health_ready = true;
+                break;
+            }
+            std::this_thread::sleep_for(poll_interval);
+        }
+        
+        ASSERT_TRUE(health_ready) << "SystemMonitor did not populate health data within timeout";
     }
     
     std::string send_request(const std::string& request) {

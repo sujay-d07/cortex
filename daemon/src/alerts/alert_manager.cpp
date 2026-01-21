@@ -13,8 +13,38 @@
 #include <cstring>
 #include <unistd.h>
 #include <cstdlib>
+#include <ctime>
 
 namespace cortexd {
+
+// Cross-platform UTC time conversion helper
+// Converts struct tm (assumed to be in UTC) to time_t
+static time_t utc_timegm(struct tm* tm) {
+#ifdef _WIN32
+    return _mkgmtime(tm);
+#else
+    return timegm(tm);
+#endif
+}
+
+// Thread-safe UTC time formatting helper
+// Formats time_t as ISO 8601 UTC string using gmtime_r
+static std::string format_utc_time(time_t time_val) {
+    struct tm tm_buf;
+#ifdef _WIN32
+    // Windows uses _gmtime_s instead of gmtime_r
+    if (_gmtime_s(&tm_buf, &time_val) != 0) {
+        return "";
+    }
+#else
+    if (gmtime_r(&time_val, &tm_buf) == nullptr) {
+        return "";
+    }
+#endif
+    std::stringstream ss;
+    ss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%SZ");
+    return ss.str();
+}
 
 // Alert JSON conversion
 json Alert::to_json() const {
@@ -28,27 +58,21 @@ json Alert::to_json() const {
     j["message"] = message;
     j["description"] = description;
     
-    // Convert timestamps to ISO 8601 strings
+    // Convert timestamps to ISO 8601 strings (thread-safe)
     auto time_t = std::chrono::system_clock::to_time_t(timestamp);
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
-    j["timestamp"] = ss.str();
+    j["timestamp"] = format_utc_time(time_t);
     
     j["status"] = static_cast<int>(status);
     j["status_name"] = AlertManager::status_to_string(status);
     
     if (acknowledged_at.has_value()) {
         auto ack_time_t = std::chrono::system_clock::to_time_t(acknowledged_at.value());
-        std::stringstream ack_ss;
-        ack_ss << std::put_time(std::gmtime(&ack_time_t), "%Y-%m-%dT%H:%M:%SZ");
-        j["acknowledged_at"] = ack_ss.str();
+        j["acknowledged_at"] = format_utc_time(ack_time_t);
     }
     
     if (dismissed_at.has_value()) {
         auto dis_time_t = std::chrono::system_clock::to_time_t(dismissed_at.value());
-        std::stringstream dis_ss;
-        dis_ss << std::put_time(std::gmtime(&dis_time_t), "%Y-%m-%dT%H:%M:%SZ");
-        j["dismissed_at"] = dis_ss.str();
+        j["dismissed_at"] = format_utc_time(dis_time_t);
     }
     
     return j;
@@ -70,7 +94,7 @@ Alert Alert::from_json(const json& j) {
         std::istringstream ss(timestamp_str);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
         if (!ss.fail()) {
-            alert.timestamp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+            alert.timestamp = std::chrono::system_clock::from_time_t(utc_timegm(&tm));
         } else {
             alert.timestamp = std::chrono::system_clock::now();
         }
@@ -87,7 +111,7 @@ Alert Alert::from_json(const json& j) {
         std::istringstream ack_ss(ack_str);
         ack_ss >> std::get_time(&ack_tm, "%Y-%m-%dT%H:%M:%SZ");
         if (!ack_ss.fail()) {
-            alert.acknowledged_at = std::chrono::system_clock::from_time_t(std::mktime(&ack_tm));
+            alert.acknowledged_at = std::chrono::system_clock::from_time_t(utc_timegm(&ack_tm));
         }
     }
     
@@ -97,7 +121,7 @@ Alert Alert::from_json(const json& j) {
         std::istringstream dis_ss(dis_str);
         dis_ss >> std::get_time(&dis_tm, "%Y-%m-%dT%H:%M:%SZ");
         if (!dis_ss.fail()) {
-            alert.dismissed_at = std::chrono::system_clock::from_time_t(std::mktime(&dis_tm));
+            alert.dismissed_at = std::chrono::system_clock::from_time_t(utc_timegm(&dis_tm));
         }
     }
     
@@ -144,6 +168,32 @@ bool AlertManager::ensure_db_directory() {
         }
         
         return true;
+    } catch (const std::filesystem::filesystem_error& e) {
+        // Check if this is a permission-related error
+        if (e.code() == std::errc::permission_denied || 
+            e.code() == std::errc::operation_not_permitted) {
+            // Fallback to user directory
+            const char* home = getenv("HOME");
+            if (home) {
+                std::filesystem::path home_dir = std::filesystem::path(home);
+                db_dir = home_dir / ".cortex";
+                try {
+                    std::filesystem::create_directories(db_dir);
+                    db_path_ = (db_dir / "alerts.db").string();
+                    LOG_WARN("AlertManager", "Permission denied for database directory, using user directory: " + db_path_);
+                    return true;
+                } catch (const std::exception& fallback_e) {
+                    LOG_ERROR("AlertManager", "Failed to create fallback database directory: " + std::string(fallback_e.what()) + " (original error: " + std::string(e.what()) + ")");
+                    return false;
+                }
+            } else {
+                LOG_ERROR("AlertManager", "Cannot determine home directory for fallback (original error: " + std::string(e.what()) + ")");
+                return false;
+            }
+        } else {
+            LOG_ERROR("AlertManager", "Failed to create database directory: " + std::string(e.what()));
+            return false;
+        }
     } catch (const std::exception& e) {
         LOG_ERROR("AlertManager", "Failed to create database directory: " + std::string(e.what()));
         return false;
@@ -407,11 +457,23 @@ std::optional<Alert> AlertManager::create_alert(const Alert& alert) {
         new_alert.timestamp = std::chrono::system_clock::now();
     }
     
-    // Convert timestamp to ISO 8601 string
+    // Convert timestamp to ISO 8601 string (thread-safe)
     auto time_t = std::chrono::system_clock::to_time_t(new_alert.timestamp);
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
-    std::string timestamp_str = ss.str();
+    std::string timestamp_str = format_utc_time(time_t);
+    
+    // Store optional timestamp strings in persistent variables to avoid use-after-free
+    std::string ack_ts;
+    std::string dis_ts;
+    
+    if (new_alert.acknowledged_at.has_value()) {
+        auto ack_time_t = std::chrono::system_clock::to_time_t(new_alert.acknowledged_at.value());
+        ack_ts = format_utc_time(ack_time_t);
+    }
+    
+    if (new_alert.dismissed_at.has_value()) {
+        auto dis_time_t = std::chrono::system_clock::to_time_t(new_alert.dismissed_at.value());
+        dis_ts = format_utc_time(dis_time_t);
+    }
     
     int rc;
     {
@@ -427,23 +489,17 @@ std::optional<Alert> AlertManager::create_alert(const Alert& alert) {
         sqlite3_bind_text(stmt, 4, new_alert.source.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 5, new_alert.message.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 6, new_alert.description.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 7, timestamp_str.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 7, timestamp_str.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_int(stmt, 8, static_cast<int>(new_alert.status));
         
         if (new_alert.acknowledged_at.has_value()) {
-            auto ack_time_t = std::chrono::system_clock::to_time_t(new_alert.acknowledged_at.value());
-            std::stringstream ack_ss;
-            ack_ss << std::put_time(std::gmtime(&ack_time_t), "%Y-%m-%dT%H:%M:%SZ");
-            sqlite3_bind_text(stmt, 9, ack_ss.str().c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 9, ack_ts.c_str(), -1, SQLITE_TRANSIENT);
         } else {
             sqlite3_bind_null(stmt, 9);
         }
         
         if (new_alert.dismissed_at.has_value()) {
-            auto dis_time_t = std::chrono::system_clock::to_time_t(new_alert.dismissed_at.value());
-            std::stringstream dis_ss;
-            dis_ss << std::put_time(std::gmtime(&dis_time_t), "%Y-%m-%dT%H:%M:%SZ");
-            sqlite3_bind_text(stmt, 10, dis_ss.str().c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 10, dis_ts.c_str(), -1, SQLITE_TRANSIENT);
         } else {
             sqlite3_bind_null(stmt, 10);
         }
@@ -498,7 +554,7 @@ std::optional<Alert> AlertManager::get_alert(const std::string& uuid) {
         std::istringstream ss(timestamp_str);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
         if (!ss.fail()) {
-            alert.timestamp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+            alert.timestamp = std::chrono::system_clock::from_time_t(utc_timegm(&tm));
         } else {
             alert.timestamp = std::chrono::system_clock::now();
         }
@@ -512,7 +568,7 @@ std::optional<Alert> AlertManager::get_alert(const std::string& uuid) {
             std::istringstream ack_ss(ack_str);
             ack_ss >> std::get_time(&ack_tm, "%Y-%m-%dT%H:%M:%SZ");
             if (!ack_ss.fail()) {
-                alert.acknowledged_at = std::chrono::system_clock::from_time_t(std::mktime(&ack_tm));
+                alert.acknowledged_at = std::chrono::system_clock::from_time_t(utc_timegm(&ack_tm));
             }
         }
         
@@ -522,7 +578,7 @@ std::optional<Alert> AlertManager::get_alert(const std::string& uuid) {
             std::istringstream dis_ss(dis_str);
             dis_ss >> std::get_time(&dis_tm, "%Y-%m-%dT%H:%M:%SZ");
             if (!dis_ss.fail()) {
-                alert.dismissed_at = std::chrono::system_clock::from_time_t(std::mktime(&dis_tm));
+                alert.dismissed_at = std::chrono::system_clock::from_time_t(utc_timegm(&dis_tm));
             }
         }
     }  // Lock released - alert data is now copied
@@ -588,7 +644,7 @@ std::vector<Alert> AlertManager::get_alerts(const AlertFilter& filter) {
         std::istringstream ss(timestamp_str);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
         if (!ss.fail()) {
-            alert.timestamp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+            alert.timestamp = std::chrono::system_clock::from_time_t(utc_timegm(&tm));
         } else {
             alert.timestamp = std::chrono::system_clock::now();
         }
@@ -602,7 +658,7 @@ std::vector<Alert> AlertManager::get_alerts(const AlertFilter& filter) {
             std::istringstream ack_ss(ack_str);
             ack_ss >> std::get_time(&ack_tm, "%Y-%m-%dT%H:%M:%SZ");
             if (!ack_ss.fail()) {
-                alert.acknowledged_at = std::chrono::system_clock::from_time_t(std::mktime(&ack_tm));
+                alert.acknowledged_at = std::chrono::system_clock::from_time_t(utc_timegm(&ack_tm));
             }
         }
         
@@ -612,7 +668,7 @@ std::vector<Alert> AlertManager::get_alerts(const AlertFilter& filter) {
             std::istringstream dis_ss(dis_str);
             dis_ss >> std::get_time(&dis_tm, "%Y-%m-%dT%H:%M:%SZ");
             if (!dis_ss.fail()) {
-                alert.dismissed_at = std::chrono::system_clock::from_time_t(std::mktime(&dis_tm));
+                alert.dismissed_at = std::chrono::system_clock::from_time_t(utc_timegm(&dis_tm));
             }
         }
         
@@ -637,9 +693,7 @@ bool AlertManager::acknowledge_alert(const std::string& uuid) {
     sqlite3* db = static_cast<sqlite3*>(db_handle_);
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
-    std::string timestamp_str = ss.str();
+    std::string timestamp_str = format_utc_time(time_t);
     
     int rc;
     int changes = 0;
@@ -675,9 +729,7 @@ size_t AlertManager::acknowledge_all() {
     sqlite3* db = static_cast<sqlite3*>(db_handle_);
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
-    std::string timestamp_str = ss.str();
+    std::string timestamp_str = format_utc_time(time_t);
     
     int rc;
     int changes = 0;
@@ -728,9 +780,7 @@ bool AlertManager::dismiss_alert(const std::string& uuid) {
     sqlite3* db = static_cast<sqlite3*>(db_handle_);
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
-    std::string timestamp_str = ss.str();
+    std::string timestamp_str = format_utc_time(time_t);
     
     int rc;
     int changes = 0;

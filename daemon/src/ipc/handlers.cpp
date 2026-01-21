@@ -166,6 +166,11 @@ Response Handlers::handle_alerts_get(const Request& req, std::shared_ptr<AlertMa
             filter.status = AlertManager::string_to_status(status_str);
         }
         
+        if (req.params.contains("source")) {
+            std::string source_str = req.params["source"].get<std::string>();
+            filter.source = source_str;
+        }
+        
         if (req.params.contains("include_dismissed")) {
             filter.include_dismissed = req.params["include_dismissed"].get<bool>();
         }

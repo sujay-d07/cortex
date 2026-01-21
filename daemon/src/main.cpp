@@ -103,7 +103,7 @@
      }
      
     // Get configuration
-    const auto& config = ConfigManager::instance().get();
+    const auto config = ConfigManager::instance().get();
     
     // Create alert manager (shared pointer for use by multiple components)
     auto alert_manager = std::make_shared<AlertManager>();

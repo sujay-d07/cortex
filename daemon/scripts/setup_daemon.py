@@ -401,6 +401,7 @@ def ensure_config_file() -> bool:
     Returns:
         bool: True if config file exists or was created successfully, False otherwise.
     """
+    import os
     config_path = Path(CONFIG_FILE)
 
     # If config already exists, we're done
@@ -414,8 +415,24 @@ def ensure_config_file() -> bool:
 
     try:
         # Create /etc/cortex directory if needed
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-
+        # Check if parent directory exists
+        if not config_path.parent.exists():
+            # If running as root, create directly; otherwise use sudo
+            if os.geteuid() == 0:
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                result = subprocess.run(
+                    ["sudo", "mkdir", "-p", str(config_path.parent)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    console.print(
+                        f"[red]Failed to create config directory: {result.stderr}[/red]"
+                    )
+                    return False
+        
         # Copy template to config file (requires sudo)
         result = subprocess.run(
             ["sudo", "cp", str(CONFIG_EXAMPLE), CONFIG_FILE],
@@ -426,10 +443,16 @@ def ensure_config_file() -> bool:
 
         if result.returncode == 0:
             # Set proper permissions
-            subprocess.run(
+            perm_result = subprocess.run(
                 ["sudo", "chmod", "0644", CONFIG_FILE],
                 check=False,
+                capture_output=True,
+                text=True,
             )
+            if perm_result.returncode != 0:
+                console.print(
+                    f"[yellow]Warning: Failed to set config file permissions: {perm_result.stderr}[/yellow]"
+                )
             console.print(f"[green]Created config file: {CONFIG_FILE}[/green]")
             log_audit_event("create_config", "Created config from template")
             return True
@@ -455,8 +478,12 @@ def install_daemon() -> bool:
               False otherwise.
     """
     # Ensure config file exists before installation
-    ensure_config_file()
-
+    result = ensure_config_file()
+    if not result:
+        console.print("[yellow]Warning: Config template missing or failed to create[/yellow]")
+        console.print("[red]Error: Cannot proceed with installation without config file[/red]")
+        sys.exit(1)
+    
     console.print("[cyan]Installing the daemon...[/cyan]")
     result = subprocess.run(["sudo", str(INSTALL_SCRIPT)], check=False)
     success = result.returncode == 0

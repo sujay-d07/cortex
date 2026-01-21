@@ -2578,11 +2578,23 @@ class CortexCLI:
         health_table.add_column("Metric", style="bold")
         health_table.add_column("Value", style="")
 
+        # Get thresholds from result, with defaults
+        thresholds = result.get("thresholds", {})
+        cpu_thresholds = thresholds.get("cpu", {})
+        cpu_warning = cpu_thresholds.get("warning", 80)
+        cpu_critical = cpu_thresholds.get("critical", 95)
+        mem_thresholds = thresholds.get("memory", {})
+        mem_warning = mem_thresholds.get("warning", 80)
+        mem_critical = mem_thresholds.get("critical", 95)
+        disk_thresholds = thresholds.get("disk", {})
+        disk_warning = disk_thresholds.get("warning", 80)
+        disk_critical = disk_thresholds.get("critical", 95)
+
         # CPU
         if "cpu" in result:
             cpu = result["cpu"]
             usage = cpu.get("usage_percent", 0)
-            color = "red" if usage >= 95 else "yellow" if usage >= 80 else "green"
+            color = "red" if usage >= cpu_critical else "yellow" if usage >= cpu_warning else "green"
             health_table.add_row(
                 "CPU Usage", f"[{color}]{usage:.1f}%[/{color}] ({cpu.get('cores', 0)} cores)"
             )
@@ -2591,7 +2603,7 @@ class CortexCLI:
         if "memory" in result:
             mem = result["memory"]
             usage = mem.get("usage_percent", 0)
-            color = "red" if usage >= 95 else "yellow" if usage >= 80 else "green"
+            color = "red" if usage >= mem_critical else "yellow" if usage >= mem_warning else "green"
             mem_gb = mem.get("used_bytes", 0) / (1024**3)
             mem_total_gb = mem.get("total_bytes", 0) / (1024**3)
             health_table.add_row(
@@ -2603,7 +2615,7 @@ class CortexCLI:
         if "disk" in result:
             disk = result["disk"]
             usage = disk.get("usage_percent", 0)
-            color = "red" if usage >= 95 else "yellow" if usage >= 80 else "green"
+            color = "red" if usage >= disk_critical else "yellow" if usage >= disk_warning else "green"
             disk_gb = disk.get("used_bytes", 0) / (1024**3)
             disk_total_gb = disk.get("total_bytes", 0) / (1024**3)
             mount_point = disk.get("mount_point", "/")

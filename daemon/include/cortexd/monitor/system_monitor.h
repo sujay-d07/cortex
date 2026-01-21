@@ -71,12 +71,12 @@ public:
     /**
      * @brief Construct system monitor
      * @param alert_manager Shared pointer to alert manager
-     * @param check_interval_seconds Interval between health checks (default: 60)
+     * @param check_interval_seconds Interval between health checks
      * @param thresholds Monitoring thresholds (required)
      */
     explicit SystemMonitor(
         std::shared_ptr<AlertManager> alert_manager,
-        int check_interval_seconds = 60,
+        int check_interval_seconds,
         const MonitoringThresholds& thresholds
     );
     

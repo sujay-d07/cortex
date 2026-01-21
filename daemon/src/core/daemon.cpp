@@ -215,29 +215,28 @@ bool Daemon::reload_config() {
              return a->priority() > b->priority();
          });
      
+     // Copy service pointers to local vector while holding lock
+     // This prevents iterator invalidation when lock is released
+     std::vector<Service*> service_ptrs;
+     for (const auto& service : services_) {
+         service_ptrs.push_back(service.get());
+     }
+     
      // Release lock before starting services (start() may take time)
      lock.unlock();
      
-     for (auto& service : services_) {
-         // Re-acquire lock to access services_ safely
-         std::shared_lock<std::shared_mutex> read_lock(services_mutex_);
-         auto it = std::find_if(services_.begin(), services_.end(),
-             [&service](const auto& s) { return s.get() == service.get(); });
-         if (it == services_.end()) {
-             read_lock.unlock();
-             continue;  // Service was removed
-         }
-         read_lock.unlock();
-         LOG_INFO("Daemon", "Starting service: " + std::string(service->name()));
+     // Iterate over local copy - no need to check if service was removed
+     for (auto* service_ptr : service_ptrs) {
+         LOG_INFO("Daemon", "Starting service: " + std::string(service_ptr->name()));
          
-         if (!service->start()) {
-             LOG_ERROR("Daemon", "Failed to start service: " + std::string(service->name()));
+         if (!service_ptr->start()) {
+             LOG_ERROR("Daemon", "Failed to start service: " + std::string(service_ptr->name()));
              // Stop already started services
              stop_services();
              return false;
          }
          
-         LOG_INFO("Daemon", "Service started: " + std::string(service->name()));
+         LOG_INFO("Daemon", "Service started: " + std::string(service_ptr->name()));
      }
      
      return true;

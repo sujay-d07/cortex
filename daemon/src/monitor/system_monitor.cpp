@@ -56,6 +56,11 @@ SystemMonitor::SystemMonitor(
     current_health_{},
     last_cpu_time_(std::chrono::steady_clock::now()),
     systemd_bus_(nullptr) {
+    // Validate check_interval_seconds to prevent busy-spin
+    if (check_interval_seconds_ <= 0) {
+        LOG_WARN("SystemMonitor", "Invalid check_interval_seconds (" + std::to_string(check_interval_seconds_) + "), clamping to minimum of 1 second");
+        check_interval_seconds_ = 1;
+    }
 }
 
 SystemMonitor::~SystemMonitor() {
@@ -421,6 +426,13 @@ int SystemMonitor::get_failed_services_count() const {
 
 void SystemMonitor::check_thresholds(const SystemHealth& health) {
     // CPU checks
+    std::string cpu_critical_key = std::to_string(static_cast<int>(AlertCategory::CPU)) + ":" + 
+                                    std::to_string(static_cast<int>(AlertSeverity::CRITICAL)) + ":" + 
+                                    "system_monitor:CPU usage critical";
+    std::string cpu_warning_key = std::to_string(static_cast<int>(AlertCategory::CPU)) + ":" + 
+                                  std::to_string(static_cast<int>(AlertSeverity::WARNING)) + ":" + 
+                                  "system_monitor:CPU usage high";
+    
     if (health.cpu_usage_percent >= thresholds_.cpu_critical) {
         create_basic_alert(
             AlertSeverity::CRITICAL,
@@ -439,9 +451,28 @@ void SystemMonitor::check_thresholds(const SystemHealth& health) {
             "CPU usage is at " + std::to_string(static_cast<int>(health.cpu_usage_percent)) + 
             "% (threshold: " + std::to_string(static_cast<int>(thresholds_.cpu_warning)) + "%)"
         );
+        // Remove critical key if it exists (downgraded from critical to warning)
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(cpu_critical_key);
+        }
+    } else {
+        // CPU usage recovered - remove both keys
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(cpu_critical_key);
+            active_alert_keys_.erase(cpu_warning_key);
+        }
     }
     
     // Memory checks
+    std::string mem_critical_key = std::to_string(static_cast<int>(AlertCategory::MEMORY)) + ":" + 
+                                   std::to_string(static_cast<int>(AlertSeverity::CRITICAL)) + ":" + 
+                                   "system_monitor:Memory usage critical";
+    std::string mem_warning_key = std::to_string(static_cast<int>(AlertCategory::MEMORY)) + ":" + 
+                                  std::to_string(static_cast<int>(AlertSeverity::WARNING)) + ":" + 
+                                  "system_monitor:Memory usage high";
+    
     if (health.memory_usage_percent >= thresholds_.memory_critical) {
         create_basic_alert(
             AlertSeverity::CRITICAL,
@@ -460,9 +491,28 @@ void SystemMonitor::check_thresholds(const SystemHealth& health) {
             "Memory usage is at " + std::to_string(static_cast<int>(health.memory_usage_percent)) + 
             "% (threshold: " + std::to_string(static_cast<int>(thresholds_.memory_warning)) + "%)"
         );
+        // Remove critical key if it exists (downgraded from critical to warning)
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(mem_critical_key);
+        }
+    } else {
+        // Memory usage recovered - remove both keys
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(mem_critical_key);
+            active_alert_keys_.erase(mem_warning_key);
+        }
     }
     
     // Disk checks
+    std::string disk_critical_key = std::to_string(static_cast<int>(AlertCategory::DISK)) + ":" + 
+                                    std::to_string(static_cast<int>(AlertSeverity::CRITICAL)) + ":" + 
+                                    "system_monitor:Disk usage critical";
+    std::string disk_warning_key = std::to_string(static_cast<int>(AlertCategory::DISK)) + ":" + 
+                                   std::to_string(static_cast<int>(AlertSeverity::WARNING)) + ":" + 
+                                   "system_monitor:Disk usage high";
+    
     if (health.disk_usage_percent >= thresholds_.disk_critical) {
         create_basic_alert(
             AlertSeverity::CRITICAL,
@@ -483,9 +533,25 @@ void SystemMonitor::check_thresholds(const SystemHealth& health) {
             std::to_string(static_cast<int>(health.disk_usage_percent)) + 
             "% (threshold: " + std::to_string(static_cast<int>(thresholds_.disk_warning)) + "%)"
         );
+        // Remove critical key if it exists (downgraded from critical to warning)
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(disk_critical_key);
+        }
+    } else {
+        // Disk usage recovered - remove both keys
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(disk_critical_key);
+            active_alert_keys_.erase(disk_warning_key);
+        }
     }
     
     // Failed services check
+    std::string service_key = std::to_string(static_cast<int>(AlertCategory::SERVICE)) + ":" + 
+                             std::to_string(static_cast<int>(AlertSeverity::ERROR)) + ":" + 
+                             "system_monitor:Failed systemd services detected";
+    
     if (health.failed_services_count > 0) {
         create_basic_alert(
             AlertSeverity::ERROR,
@@ -494,6 +560,12 @@ void SystemMonitor::check_thresholds(const SystemHealth& health) {
             "Failed systemd services detected",
             std::to_string(health.failed_services_count) + " systemd service(s) are in failed state"
         );
+    } else {
+        // No failed services - remove key if it exists
+        {
+            std::lock_guard<std::mutex> lock(alert_keys_mutex_);
+            active_alert_keys_.erase(service_key);
+        }
     }
 }
 
