@@ -406,6 +406,9 @@ void AlertManager::load_initial_counters() {
         sqlite3_reset(stmt);
         sqlite3_bind_int(stmt, 1, static_cast<int>(AlertStatus::DISMISSED));
         
+        count_total_.store(0, std::memory_order_relaxed);
+        int total = 0;
+        
         int rc;
         while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
         int severity = sqlite3_column_int(stmt, 0);
@@ -425,8 +428,9 @@ void AlertManager::load_initial_counters() {
                 count_critical_.store(count, std::memory_order_relaxed);
                 break;
         }
-        count_total_.fetch_add(count, std::memory_order_relaxed);
+        total += count;
         }  // End of while loop
+        count_total_.store(total, std::memory_order_relaxed);
     }  // Lock released
 }
 
